@@ -272,6 +272,11 @@ class Bcc_Public {
 
 		// Iterate over new members ...
 		foreach($members as $member) {
+			if (!isset($member->membershipNumber) || is_null($member->membershipNumber) || $member->membershipNumber === '') {
+				//Only accepted/paid members have a membershipNumber; Others are prospects and shoud not get access to basecamp
+				continue;
+			}
+
 			// ... until we reached the last synced member
 			if ($member->email === $lastSyncedMember[1]) {
 				$log .= "\r\n" . 'Current member ' . $member->email . ' is already synced: ' . $lastSyncedMember[1];
