@@ -213,9 +213,25 @@ class Bcc_Public {
 	 */
 	public function easy_verein_basecamp_sync() {
 		global $wpdb;
+		$log = '';
 
-		if (get_option('bcc_ev_api_key') === '' || get_option('bcc_ev_api_url') === '' || get_option('bcc_ev_project_id') === '') {
-			wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'One or more of the required parameters is not set. Check BasecampConnector Settings.');
+		if (get_option('bcc_ev_api_key') === '' || get_option('bcc_ev_api_key') === false || 
+			get_option('bcc_ev_api_url') === '' || get_option('bcc_ev_api_url') === false ||
+			get_option('bcc_ev_project_id') === '' || get_option('bcc_ev_project_id') === false
+		) {
+			$missingParams = [];
+			if (get_option('bcc_ev_api_key') === '' || get_option('bcc_ev_api_key') === false) {
+				$missingParams[] = 'bcc_ev_api_key';
+			}
+
+			if (get_option('bcc_ev_api_url') === '' || get_option('bcc_ev_api_url') === false) {
+				$missingParams[] = 'bcc_ev_api_url';
+			}
+
+			if (get_option('bcc_ev_project_id') === '' || get_option('bcc_ev_project_id') === false) {
+				$missingParams[] = 'bcc_ev_project_id';
+			}
+			wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'One or more of the required parameters is not set: ' . implode(', ', $missingParams) . ' | Check BasecampConnector Settings.');
 			exit();
 		}
 
@@ -240,9 +256,15 @@ class Bcc_Public {
 		$result = $wpdb->get_var(
 			'SELECT value FROM `' . $wpdb->prefix . 'bcc_options` WHERE identifier = "ev_bc_sync_last_new"'
 		);
+
+		if ($result === NULL || $result === '') {
+			wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Option "ev_bc_sync_last_new" not set');
+			exit();
+		}
+
 		// 0 => email address, 1 => member ID (member ID is not reliable, can be null); added for possibe future use
 		$lastSyncedMember = explode('|', $result);
-		
+
 		$bclient = new BClient();
 
 		$additionalProjects = explode(',', get_option('bcc_ev_project_id_additional'));
@@ -252,6 +274,7 @@ class Bcc_Public {
 		foreach($members as $member) {
 			// ... until we reached the last synced member
 			if ($member->email === $lastSyncedMember[1]) {
+				$log .= "\r\n" . 'Current member ' . $member->email . ' is already synced: ' . $lastSyncedMember[1];
 				break;
 			}
 
@@ -277,6 +300,8 @@ class Bcc_Public {
 				'title' => ''
 			]);
 
+			$log .= "\r\n" . 'Granted ' . $member->email . ' to project ' . get_option('bcc_ev_project_id') . '; Result: ' . print_r($data, true);
+
 			if (!property_exists($data, 'granted')) {
 				wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Could not create Basecamp account for ' . $member->email . "\r\n" . print_r($data, true));
 				exit();
@@ -293,10 +318,15 @@ class Bcc_Public {
 			}			
 
 			// Create the welcome message
-			$message = str_replace('{user}', '<bc-attachment sgid="' . $data->granted[0]->attachable_sgid . '"></bc-attachment>', $message);
-			$result = $bclient->comments()->create(get_option('bcc_ev_project_id'), get_option('bcc_ev_welcome_text_message_id'), array(
-				'content' => $message
-			));
+			if (count($data->granted) > 0) {
+				$userLink = '<bc-attachment sgid="' . $data->granted[0]->attachable_sgid . '"></bc-attachment>';
+				$message = str_replace('{user}', $userLink, $message);
+				$result = $bclient->comments()->create(get_option('bcc_ev_project_id'), get_option('bcc_ev_welcome_text_message_id'), array(
+					'content' => $message
+				));
+
+				$log .= "\r\n" . 'Posted welcome message: ' . $message . '; Result: ' . print_r($result, true);
+			}
 
 			// Store the newest synced member
 			$result = $wpdb->update(
@@ -310,6 +340,10 @@ class Bcc_Public {
 				array('%s'),
 				array('%s')
 			);
+
+			$log .= "\r\n" . 'Added ' . $member->email;
 		}
+
+		wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Log', $log);
 	}
 }
