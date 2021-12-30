@@ -244,14 +244,16 @@ class Bcc_Public {
 					'Authorization' => 'Token ' . get_option('bcc_ev_api_key')
 				]
 			]);
+		} catch (GuzzleHttp\Exception\ClientException $e) {
+			$response = $e->getResponse();
+			$responseBodyAsString = $response->getBody()->getContents();
+			wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Error while retrieving member list from EasyVerein' . "\r\n" . print_r($responseBodyAsString, true));
 		} catch (\Exception $e) {
 			wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Error while retrieving member list from EasyVerein' . "\r\n" . print_r($e, true));
 			exit();
 		}
-
 		$list = json_decode($response->getBody()->getContents());
 		$members = $list->results;
-		
 		// Get data of last synced member
 		$result = $wpdb->get_var(
 			'SELECT value FROM `' . $wpdb->prefix . 'bcc_options` WHERE identifier = "ev_bc_sync_last_new"'
