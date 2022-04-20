@@ -58,7 +58,7 @@ class Bcc_Activator {
 		if ($wpdb->get_var('SELECT count(*) FROM information_schema.TABLES WHERE (TABLE_SCHEMA = "' . $wpdb->dbname . '") AND (TABLE_NAME = "' . $wpdb->base_prefix . 'bcc_projects")') <= 0) {
 			// Table not installed, install it
 			$charset_collate = $wpdb->get_charset_collate();
-			$sql = "CREATE TABLE `wp_bcc_projects` (
+			$sql = "CREATE TABLE `{$wpdb->base_prefix}bcc_projects` (
 				`id` int(11) NOT NULL AUTO_INCREMENT,
 				`bc_message_id` VARCHAR(25) NOT NULL,
 				`bc_todo_id` VARCHAR(25) NOT NULL,
