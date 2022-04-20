@@ -127,6 +127,9 @@ class Bcc_Public {
 	/* WEBHOOKS */
 	public function rest_api_init() {
 		// Webhook for strawpolls.com
+		// Route is /wp-json/bcc/v1/webhook/
+		// See here: https://developer.wordpress.org/rest-api/extending-the-rest-api/adding-custom-endpoints/
+
 		register_rest_route( 'bcc/v1', '/webhook/', array(
 			'methods' => 'POST',
 			'callback' => array( $this, 'webhook' ),
@@ -140,26 +143,29 @@ class Bcc_Public {
 	 */
 	public function webhook(WP_REST_Request $request) {
 		global $wpdb;
-
-		$deadline = $request->get_param('deadline');
-		if ($deadline !== NULL) {
-			$poll_content_id = $request->get_param('content')['id'];
+	
+		$event = $request->get_param('event');
+		$data = $request->get_param('data')['poll'];
+		
+		if ($event === 'deadline_poll') {
+			$poll_id = $data['id'];
 
 			$bcMessageId = $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT bc_message_id FROM `" . $wpdb->prefix . "bcc_projects` WHERE poll_content_id = %s",
-            		$poll_content_id
+            		$poll_id
 				)
 			);
 
 			// Post voting results on basecamp
             $client = new BClient();
 
-			$totalCount = $deadline['results']['total_votes'];
+			$totalCount = 0;
 
 			$options = [];
-			foreach($deadline['results']['options'] as $option) {
-				$options[$option['name']] = $option['votes'];
+			foreach($data['poll_options'] as $option) {
+				$options[$option['value']] = $option['vote_count'];
+				$totalCount = $totalCount + $option['vote_count'];
 			}
 
 			if ($options['Ja'] > $options['Nein']) {
@@ -180,7 +186,7 @@ class Bcc_Public {
 			$bcTodoId = $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT bc_todo_id FROM `" . $wpdb->prefix . "bcc_projects` WHERE poll_content_id = %s",
-            		$poll_content_id
+            		$poll_id
 				)
 			);
 
@@ -188,18 +194,14 @@ class Bcc_Public {
 
 			// Delete Poll
 			$client = new \GuzzleHttp\Client();
-            $response = $client->post('https://strawpoll.com/api/content/delete', [
-                'headers' => [
-                    'API-KEY' => get_option('bcc_sp_api_key'),
-                    'Content-Type' => 'application/json'
-                ],
-                GuzzleHttp\RequestOptions::JSON => [
-                    'content_id' => $poll_content_id
-                ]
-            ]);
+			$response = $client->delete('https://api.strawpoll.com/v2/polls/' . $poll_id, [
+				'headers' => [
+					'X-API-KEY' => get_option('bcc_sp_api_key'),
+				]
+			]);
 			
 			// Remove from DB
-			$wpdb->delete( $wpdb->prefix . 'bcc_projects', array( 'poll_content_id' => $poll_content_id ) );
+			$wpdb->delete( $wpdb->prefix . 'bcc_projects', array( 'poll_content_id' => $poll_id ) );
 		}
 	}
 

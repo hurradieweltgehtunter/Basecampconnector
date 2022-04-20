@@ -108,8 +108,8 @@
 							location	: window.location.origin + window.location.pathname
 						},
 						error : function( MLHttpRequest, textStatus, errorThrown ) {
-							console.log(errorThrown)
-							console.log(textStatus)
+							console.log('Ajax ERROR: ' + errorThrown)
+							console.log('Ajax ERROR: ' + textStatus)
 							
 							$('.general-error-ajax').removeClass('d-none')
 							button.prop("disabled",false);

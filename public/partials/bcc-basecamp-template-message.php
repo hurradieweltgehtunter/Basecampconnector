@@ -58,7 +58,7 @@ Die ausführlichen Fragen, die den Bewerber:innen gestellt wurden findest du hie
 <h1>Stimmungsbild</h1>
 Bitte stimme kurz ab ob du der Meinung bist, dass dieses Projekt auf dem PLATZprojekt eine Zukunft hat oder nicht.<br />
 Die Abstimmung endet am <?php echo $deadline->format('d.m.Y H:i'); ?>. <br />
-<a href="https://strawpoll.com/<?php echo $pollData['content_id']; ?>">zur Abstimmung</a>
+<a href="<?php echo $pollData['url']; ?>">zur Abstimmung</a>
 <br />
 <br />
 Herzallerliebste Grüße<br />

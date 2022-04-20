@@ -62,38 +62,66 @@ if( ! class_exists( 'Plugin_Public_Ajax' ) ){
                 header("HTTP/1.1 400 Bad Request");
                 exit();
             }
-            
+
             foreach($_POST['data'] as $key=> $value) {
                 $_POST['data'][$key] = strip_tags(htmlspecialchars(trim($value)));
             }
 
-            $bclient = new BClient();
-
             /* Create the poll */
             $deadline = new DateTime(date('Y-m-d', strtotime('+' . get_option('bcc_sp_duration', 5) . ' days')));
 
-            $client = new \GuzzleHttp\Client();
-            $response = $client->post('https://strawpoll.com/api/poll', [
-                'headers' => [
-                    'API-KEY' => get_option('bcc_sp_api_key'),
-                    'Content-Type' => 'application/json'
+            $body = json_encode([
+                "type" => "multiple_choice",
+                "title" => "Stimmungsbild Projektanfrage " . $_POST['data']['project_name'],
+                "poll_meta" => [
+                    "description" => "Würdest du dieses Projekt zukünftig gerne auf dem PLATZprojekt sehen?",
+                    "location" => ""
                 ],
-                GuzzleHttp\RequestOptions::JSON => [
-                    'poll' => [
-                        "title" => "Stimmungsbild Projektanfrage " . $_POST['data']['project_name'],
-                        "description" => "Würdest du dieses Projekt zukünftig gerne auf dem PLATZprojekt sehen?",
-                        "answers" => ["Ja","Nein","Enthaltung"],
-                        "has_deadline" => 1,
-		                "deadline" => $deadline->format('Y-m-d\TH:i:s\Z'),
-                        "ma" => false,
-                        'priv' => false,
-                        'co' => false
-                    ]
+                "media" => [
+                    "path" => null
+                ],
+                "poll_options" => [
+                    ["value" => "Ja"],
+                    ["value" => "Nein"],
+                    ["value" => "Enthaltung"],
+                ],
+                "poll_config" => [
+                    "is_private" => 1,
+                    "allow_comments" => 0,
+                    "is_multiple_choice" => 0,
+                    "multiple_choice_min" => null,
+                    "multiple_choice_max" => null,
+                    "require_voter_names" => 1,
+                    "duplication_checking" => "ip",
+                    "deadline_at" => $deadline->getTimestamp(),
+                    "status" => "published",
+                    "require_voter_names" => 0,
+                    "send_webhooks" => 1
                 ]
             ]);
-
-            $pollData = json_decode($response->getBody()->getContents(), true);
             
+            $client = new \GuzzleHttp\Client();
+            $pollData = [
+                'content_id' => null
+            ];
+
+            try {
+                $response = $client->request('POST', 'https://api.strawpoll.com/v2/polls', [
+                    'headers' => [
+                        'X-API-KEY' => get_option('bcc_sp_api_key')
+                    ],
+                    'body' => $body
+                ]);
+                
+                $pollData = json_decode($response->getBody()->getContents(), true)['poll'];
+
+            } catch(Exception $e) {
+                wp_mail( get_option( 'admin_email' ), 'Strawpoll Error', 'Could not create StrawPoll: ' . $e->getMessage() . "\r\n" . 'Project: ' . $_POST['data']['project_name']);
+            }
+
+            // Create Basecamp Client
+            $bclient = new BClient();
+
             // Create the main post
             ob_start();
             include 'partials/bcc-basecamp-template-message.php';
@@ -135,7 +163,7 @@ if( ! class_exists( 'Plugin_Public_Ajax' ) ){
 
                 $newTodo = $bclient->todos()->create(get_option('bcc_b3_project_id'), $newToDoList->id, array(
                     'content' => 'Stimmungsbild',
-                    'description' => 'Bitte stimme kurz ab ob du dieses Projekt zukünftig gerne auf dem PLATZprojekt sehen möchtest oder nicht. <br /><a href="https://strawpoll.com/' . $pollData['content_id'] . '">zur Abstimmung</a>',
+                    'description' => 'Bitte stimme kurz ab ob du dieses Projekt zukünftig gerne auf dem PLATZprojekt sehen möchtest oder nicht. <br /><a href="' . $pollData['url'] . '">zur Abstimmung</a>',
                     'assignee_ids' => $assignees,
                     'notify' => true,
                     'due_on' => $dueDate,
@@ -161,7 +189,7 @@ if( ! class_exists( 'Plugin_Public_Ajax' ) ){
                 array( 
                     "bc_message_id" => $newMessage->id,
                     "bc_todo_id" => $newTodo->id,
-                    "poll_content_id" => $pollData['content_id']
+                    "poll_content_id" => $pollData['id']
                 ), array( "%d", "%s", "%s" )
             );
             
