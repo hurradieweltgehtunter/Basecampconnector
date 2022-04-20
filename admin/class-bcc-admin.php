@@ -211,6 +211,7 @@ class Bcc_Admin {
 		if ($guzzleResult->getStatusCode() === 200 ) {
 
 			$result = json_decode($guzzleResult->getBody()->getContents(), true);
+			
 			$expiry = time() + (int) $result['expires_in'] - 10;
 
 			$wpdb->query( $wpdb->prepare( "UPDATE `" . $wpdb->prefix . "bcc_options` SET `value` = %s WHERE `" . $wpdb->prefix . "bcc_options`.`identifier` = 'access_token';", array($result['access_token'])));
@@ -224,7 +225,7 @@ class Bcc_Admin {
 		} else {
 			$this->error = $guzzleResult->getStatusCode() . ': ' . $guzzleResult->getReasonPhrase() . ' | ' . print_r($guzzleResult->getBody()->getContents(), true);
 			$_SESSION['authenticated'] = false;
-			header('Location: ' . $this->adminUrl);
+			// header('Location: ' . $this->adminUrl);
 		}
 	}
 }
