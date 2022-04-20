@@ -58,7 +58,7 @@
                     <td>Access Code available</td>
                     <td>
                         <?php
-                        if (trim($wpdb->get_var( "SELECT `value` FROM " . $wpdb->prefix . "bcc_options WHERE `identifier` = 'access_token'" )) !== '') :
+                        if (trim((string) $wpdb->get_var( "SELECT `value` FROM " . $wpdb->prefix . "bcc_options WHERE `identifier` = 'access_token'" )) !== '') :
                             echo 'Yes';
                         else :
                             echo 'No. Scroll down to bottom of this page and click on "Authenticate App"';
@@ -70,7 +70,7 @@
                     <td>Refresh Token available</td>
                     <td>
                         <?php
-                        if (trim($wpdb->get_var( "SELECT `value` FROM " . $wpdb->prefix . "bcc_options WHERE `identifier` = 'refresh_token'" )) !== '') :
+                        if (trim((string) $wpdb->get_var( "SELECT `value` FROM " . $wpdb->prefix . "bcc_options WHERE `identifier` = 'refresh_token'" )) !== '') :
                             echo 'Yes';
                         else :
                             echo 'No. Scroll down to bottom of this page and click on "Authenticate App"';
@@ -83,7 +83,7 @@
                     <td>
                         <?php
                         $expiry = $wpdb->get_var( "SELECT `value` FROM " . $wpdb->prefix . "bcc_options WHERE `identifier` = 'access_token_expires'" );
-                        if (trim($expiry) !== ''):
+                        if (trim((string) $expiry) !== ''):
                             echo date('d.m.Y H:i', $expiry);
                         else :
                             echo 'Not set';
