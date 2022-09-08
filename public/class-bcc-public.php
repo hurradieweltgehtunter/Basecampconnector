@@ -236,7 +236,7 @@ class Bcc_Public {
 			wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'One or more of the required parameters is not set: ' . implode(', ', $missingParams) . ' | Check BasecampConnector Settings.');
 			exit();
 		}
-
+		
 		$client = new \GuzzleHttp\Client();
 
 		// Get all members ordered by joinDate DESC
@@ -256,29 +256,37 @@ class Bcc_Public {
 		}
 		$list = json_decode($response->getBody()->getContents());
 		$members = $list->results;
+		
 		// Get data of last synced member
 		$result = $wpdb->get_var(
 			'SELECT value FROM `' . $wpdb->prefix . 'bcc_options` WHERE identifier = "ev_bc_sync_last_new"'
 		);
 
 		if ($result === NULL || $result === '') {
-			wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Option "ev_bc_sync_last_new" not set');
-			exit();
+			// wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Option "ev_bc_sync_last_new" not set');
+			// exit();
 		}
 
-		// 0 => email address, 1 => member ID (member ID is not reliable, can be null); added for possibe future use
+		// 0 => membership number, 1 => username or email
 		$lastSyncedMember = explode('|', $result);
 
 		$bclient = new BClient();
 
 		$additionalProjects = explode(',', get_option('bcc_ev_project_id_additional'));
+
+		if(count($additionalProjects) === 0) {
+			$additionalProjects = [];
+		}
+
+		$log .= "\r\n" . 'Found ' . count($additionalProjects) . ' additional projects';
+		
 		$message = get_option('bcc_ev_welcome_text');
 
 		// Iterate over new members ...
 		foreach($members as $member) {
 			// ... until we reached the last synced member
-			if ($member->email === $lastSyncedMember[1]) {
-				$log .= "\r\n" . 'Current member ' . $member->email . ' is already synced: ' . $lastSyncedMember[1];
+			if ($member->emailOrUserName === $lastSyncedMember[1]) {
+				$log .= "\r\n" . 'Current member ' . $member->emailOrUserName . ' is already synced: ' . $lastSyncedMember[1];
 				break;
 			}
 
@@ -300,29 +308,36 @@ class Bcc_Public {
 			}
 
 			$details = json_decode($response->getBody()->getContents());
-			
+
 			// Create the basecamp account
 			$data = $bclient->people()->create([
-				'email' => $member->email,
+				'email' => $member->emailOrUserName,
 				'name' => $details->name,
 				'company' => $details->companyName,
 				'title' => ''
 			]);
 
-			$log .= "\r\n" . 'Granted ' . $member->email . ' to project ' . get_option('bcc_ev_project_id') . '; Result: ' . print_r($data, true);
-
+			$log .= "\r\n" . 'Granted ' . $member->emailOrUserName . ' to project ' . get_option('bcc_ev_project_id') . '; Result: <pre>' . print_r($data, true) . '</pre>';
+			
 			if (!property_exists($data, 'granted')) {
-				wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Could not create Basecamp account for ' . $member->email . "\r\n" . print_r($data, true));
+				$log .= 'Could not create Basecamp account for ' . $member->emailOrUserName . "\r\n" . print_r($data, true);
+				wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Could not create Basecamp account for ' . $member->emailOrUserName . "\r\n <pre>" . print_r($data, true) . '</pre>');
+				echo $log;
 				exit();
 			}
 
 			// Add user to additional projects
 			foreach($additionalProjects as $projectId) {
-				$result = $bclient->people()->addToProject(trim($projectId), $data->granted[0]->id);
+				$log .= "\r\n" . 'Adding ' . $member->emailOrUserName . ' to project ' . $projectId;
+				$result = $bclient->people()->addToProject(trim($projectId), $data->granted[0]->id);				
 				
 				if (!property_exists($result, 'granted')) {
-					wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Could not add user ' . $member->email . ' to project ' . $projectId . "\r\n" . print_r($data, true));
+					$log .= 'Could not add user ' . $member->emailOrUserName . ' to project ' . $projectId . "\r\n <pre>" . print_r($data, true) . '</pre>';
+					wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Could not add user ' . $member->emailOrUserName . ' to project ' . $projectId . "\r\n" . print_r($data, true));
+					echo $log;
 					exit();
+				} else {
+					$log .= "\r\n" . 'Added ' . $member->emailOrUserName . ' to project ' . $projectId . "\r\n";
 				}
 			}			
 
@@ -341,7 +356,7 @@ class Bcc_Public {
 			$result = $wpdb->update(
 				"{$wpdb->base_prefix}bcc_options", 
 				array(
-					'value' => $member->membershipNumber . '|' . $member->email
+					'value' => $member->membershipNumber . '|' . $member->emailOrUserName
 				), 
 				array(
 					'identifier' => 'ev_bc_sync_last_new'
@@ -350,9 +365,9 @@ class Bcc_Public {
 				array('%s')
 			);
 
-			$log .= "\r\n" . 'Added ' . $member->email;
+			$log .= "\r\n" . 'Added ' . $member->emailOrUserName;
 		}
 
-		wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Log', $log);
+		// wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Log', $log);
 	}
 }
