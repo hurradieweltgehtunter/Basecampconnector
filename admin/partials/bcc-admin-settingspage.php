@@ -39,7 +39,9 @@
         ?>
         <div class="alert alert-danger" role="alert">
             Basecamp-Connection failed!<br />
-            <?php echo $this->error; ?>
+            <?php echo $this->error; 
+            echo $_SESSION['error'];
+            ?>
         </div>
         <?php
         endif;

@@ -62,7 +62,7 @@ class People extends AbstractApi
         return $data;
     }
 
-    public function create($details) {
+    public function create($details, $projectId) {
         $params = [
             'create'=> [
                 [
@@ -74,7 +74,7 @@ class People extends AbstractApi
             ]
         ];
         
-        $data = $this->put('/projects/' . get_option('bcc_ev_project_id') . '/people/users.json', $params);
+        $data = $this->put('/projects/' . $projectId . '/people/users.json', $params);
 
         return $data;
     }

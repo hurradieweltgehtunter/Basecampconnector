@@ -33,9 +33,11 @@ class Bcc_Deactivator {
 		global $wpdb;
 
 		require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-		$sql = "DROP TABLE `" . $wpdb->base_prefix . "bcc_options`";
-		dbDelta($sql);
-		$sql = "DROP TABLE `" . $wpdb->base_prefix . "bcc_projects`";
-		dbDelta($sql);
+
+		// $sql = "DROP TABLE `" . $wpdb->base_prefix . "bcc_options`";
+		// $wpdb->query($sql);
+
+		// $sql = "DROP TABLE `" . $wpdb->base_prefix . "bcc_projects`";
+		// $wpdb->query($sql);
 	}
 }

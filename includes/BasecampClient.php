@@ -25,6 +25,8 @@ if( ! class_exists( 'BClient' ) ){
          * @var array
          */
         private $accountData = null;
+        private $debug = false;
+        private $headers = [];
 
         /**
          * Class constructor.
@@ -94,6 +96,10 @@ if( ! class_exists( 'BClient' ) ){
                 $this->connectionValid();
                 exit('done');
             }
+        }
+
+        public function getAccountId() {
+            return $this->accountData['accountId'];
         }
 
         private function connectionValid() {

@@ -174,6 +174,7 @@ class Bcc_Admin {
 		// EasyVerein 
 		register_setting( 'bcc_options', 'bcc_ev_api_url' );
 		register_setting( 'bcc_options', 'bcc_ev_api_key' );
+		register_setting( 'bcc_options', 'bcc_ev_api_token' );
 		register_setting( 'bcc_options', 'bcc_ev_project_id' );
 		register_setting( 'bcc_options', 'bcc_ev_welcome_text' );
 		register_setting( 'bcc_options', 'bcc_ev_welcome_text_message_id' );
@@ -200,32 +201,41 @@ class Bcc_Admin {
 		            'User-Agent'        => get_option('bcc_b3_user_agent'),
 		            'Content-Type'      => 'application/json; charset=utf-8',
 		            'Accept'            => 'application/json',
-		            'Accept-Encoding'   => 'gzip, deflate, br'
 		        ]
 		    ]);
 
-		} catch (\GuzzleHttp\Exception\RequestException $e) {
-		    $guzzleResult = $e->getResponse();	
-		}
+				$statusCode = $guzzleResult->getStatusCode();
+    		$responseBody = $guzzleResult->getBody()->getContents();
+				$result = json_decode($responseBody, true);
 
-		if ($guzzleResult->getStatusCode() === 200 ) {
+				if ($statusCode === 200 ) {
 
-			$result = json_decode($guzzleResult->getBody()->getContents(), true);
-			
-			$expiry = time() + (int) $result['expires_in'] - 10;
+					// Check, if response has all required fields
+					if (!isset($result['access_token']) || !isset($result['refresh_token']) || !isset($result['expires_in'])) {
+						$_SESSION['error'] = 'Response does not contain all required fields';
+						$_SESSION['authenticated'] = false;
+						header('Location: ' . $this->adminUrl);
+						exit();
+					}
 
-			$wpdb->query( $wpdb->prepare( "UPDATE `" . $wpdb->prefix . "bcc_options` SET `value` = %s WHERE `" . $wpdb->prefix . "bcc_options`.`identifier` = 'access_token';", array($result['access_token'])));
-			$wpdb->query( $wpdb->prepare( "UPDATE `" . $wpdb->prefix . "bcc_options` SET `value` = %s WHERE `" . $wpdb->prefix . "bcc_options`.`identifier` = 'refresh_token';", array($result['refresh_token'])));
-			$wpdb->query( $wpdb->prepare( "UPDATE `" . $wpdb->prefix . "bcc_options` SET `value` = %s WHERE `" . $wpdb->prefix . "bcc_options`.`identifier` = 'access_token_expires';", array($expiry)));
+					$expiry = time() + (int) $result['expires_in'] - 10;
 
-			// Cut off the auth query params
-			$_SESSION['authenticated'] = true;
-			header('Location: ' . $this->adminUrl);
-			exit();
-		} else {
-			$this->error = $guzzleResult->getStatusCode() . ': ' . $guzzleResult->getReasonPhrase() . ' | ' . print_r($guzzleResult->getBody()->getContents(), true);
-			$_SESSION['authenticated'] = false;
-			// header('Location: ' . $this->adminUrl);
-		}
+					$wpdb->query( $wpdb->prepare( "UPDATE `" . $wpdb->prefix . "bcc_options` SET `value` = %s WHERE `" . $wpdb->prefix . "bcc_options`.`identifier` = 'access_token';", array($result['access_token'])));
+					$wpdb->query( $wpdb->prepare( "UPDATE `" . $wpdb->prefix . "bcc_options` SET `value` = %s WHERE `" . $wpdb->prefix . "bcc_options`.`identifier` = 'refresh_token';", array($result['refresh_token'])));
+					$wpdb->query( $wpdb->prepare( "UPDATE `" . $wpdb->prefix . "bcc_options` SET `value` = %s WHERE `" . $wpdb->prefix . "bcc_options`.`identifier` = 'access_token_expires';", array($expiry)));
+
+					// Cut off the auth query params
+					$_SESSION['authenticated'] = true;
+					header('Location: ' . $this->adminUrl);
+					exit();
+				} else {
+					$this->error = $guzzleResult->getStatusCode() . ': ' . $guzzleResult->getReasonPhrase() . ' | ' . print_r($guzzleResult->getBody()->getContents(), true);
+					$_SESSION['authenticated'] = false;
+					// header('Location: ' . $this->adminUrl);
+				}
+			 } catch (\GuzzleHttp\Exception\RequestException $e) {
+		    $guzzleResult = $e->getResponse();
+				$this->error = $guzzleResult->getStatusCode() . ': ' . $guzzleResult->getReasonPhrase() . ' | ' . print_r($guzzleResult->getBody()->getContents(), true);
+			}
 	}
 }

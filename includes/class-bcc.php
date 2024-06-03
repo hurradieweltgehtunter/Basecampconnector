@@ -129,6 +129,7 @@ class Bcc {
 
 		require plugin_dir_path( dirname( __FILE__ ) ) . '/vendor/autoload.php';
 		require_once(plugin_dir_path(__FILE__) . '/../includes/BasecampClient.php');
+		require_once(plugin_dir_path(__FILE__) . '/../includes/EasyvereinClient.php');
 
 		$this->loader = new Bcc_Loader();
 

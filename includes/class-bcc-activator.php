@@ -50,6 +50,7 @@ class Bcc_Activator {
 				$wpdb->insert("{$wpdb->base_prefix}bcc_options", array("identifier" => 'access_token_expires',"value" => ''),array("%s", "%s"));
 				$wpdb->insert("{$wpdb->base_prefix}bcc_options", array("identifier" => 'ev_bc_sync_last_new',"value" => ''),array("%s", "%s"));
 				$wpdb->insert("{$wpdb->base_prefix}bcc_options", array("identifier" => 'ev_bc_sync_last_deleted',"value" => ''),array("%s", "%s"));
+				$wpdb->insert("{$wpdb->base_prefix}bcc_options", array("identifier" => 'ev_api_token',"value" => ''),array("%s", "%s"));
 			}
 		} else {
 			// Table already installed
