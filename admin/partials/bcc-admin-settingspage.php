@@ -94,6 +94,39 @@
                         <p>Tokens refresh automatically, <br />you don't need to do anything</p>
                     </td>
                 </tr>
+                <tr scope="row">
+                    <td>Latest synced Member</td>
+                    <td>
+                        <?php
+                        $evClient = new EasyVereinClient();
+                        $latestSyncedMember = $evClient->getLatestSyncedMember();
+                        ?>
+                        <table class="table">
+                            <tbody>
+                                <tr>
+                                    <td>Name</td>
+                                    <td><?php echo $latestSyncedMember['firstName'] . ' ' . $latestSyncedMember['familyName']; ?></td>
+                                </tr>
+                                <tr>
+                                    <td>Email</td>
+                                    <td><?php echo $latestSyncedMember['emailOrUserName']; ?></td>
+                                </tr>
+                                <tr>
+                                    <td>Membership Number</td>
+                                    <td><?php echo $latestSyncedMember['membershipNumber']; ?></td>
+                                </tr>
+                                <tr>
+                                    <td>Join Date</td>
+                                    <td><?php echo date('d.m.Y', strtotime($latestSyncedMember['joinDate'])); ?></td>
+                                </tr>
+                                <tr>
+                                    <td>Sync Date</td>
+                                    <td><?php echo date('d.m.Y', strtotime($latestSyncedMember['synced_at'])); ?></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>

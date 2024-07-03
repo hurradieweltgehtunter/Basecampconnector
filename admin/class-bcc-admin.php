@@ -174,7 +174,7 @@ class Bcc_Admin {
 		// EasyVerein 
 		register_setting( 'bcc_options', 'bcc_ev_api_url' );
 		register_setting( 'bcc_options', 'bcc_ev_api_key' );
-		register_setting( 'bcc_options', 'bcc_ev_api_token' );
+		register_setting( 'bcc_options', 'bcc_ev_api_token' ); // Not needed? 3.7.2024, FL
 		register_setting( 'bcc_options', 'bcc_ev_project_id' );
 		register_setting( 'bcc_options', 'bcc_ev_welcome_text' );
 		register_setting( 'bcc_options', 'bcc_ev_welcome_text_message_id' );

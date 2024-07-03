@@ -29,7 +29,14 @@ class EasyVereinClient {
     $this->client = new GuzzleHttp\Client();
   }
 
-  public static function getOption ($option) {
+  /**
+   * Method to read option values from plugin table bcc_options (not to be confused with get_option() function from WP core reading from wp_options table)
+   * 
+   * @param string $option
+   * @return string
+   */
+  public static function getOption ($option): string
+  {
     global $wpdb;
     return $wpdb->get_var('SELECT `value` FROM ' . $wpdb->prefix . 'bcc_options WHERE `identifier` = "' . $option . '"');
   }
@@ -38,10 +45,12 @@ class EasyVereinClient {
   {
     $url = get_option('bcc_ev_api_url') . 'refresh-token';
 
+    $headers = [
+      'Authorization' => 'Bearer ' . get_option('bcc_ev_api_key')
+    ];
+    
     $response = $this->client->request('GET', $url, [
-      'headers' => [
-        'Authorization' => 'Bearer ' . get_option('bcc_ev_api_key')
-      ]
+      'headers' => $headers
     ]);
 
     $responseBody = $response->getBody()->getContents();
@@ -67,7 +76,7 @@ class EasyVereinClient {
 			]
 		]);
 
-    // CHeck header if tokenRefreshNeeded is true
+    // Check header if tokenRefreshNeeded is true
     $tokenRefreshNeeded = $response->getHeader('tokenRefreshNeeded');
     if ($tokenRefreshNeeded[0] === 'true') {
       $this->refreshApiToken();
@@ -90,17 +99,47 @@ class EasyVereinClient {
     $result = $this->db->get_var('SELECT `value` FROM ' . $this->db->prefix . 'bcc_options WHERE `identifier` = "ev_bc_sync_last_new"');
     
     if ($result !== null) {
-      $result = explode('|', $result);
-      $lastSyncedMember = [
-        'membership_number' => $result[0],
-        'username' => $result[1]
-      ];
+      $lastSyncedMember = json_decode($result, true);
 
+      // If its not a valid json string, it's a legacy format with | as delimiter
+      // TODO: Remove this after latest member got saved in json format (3.7.2024, FL)
+      if ($lastSyncedMember === null) {
+        $result = explode('|', $result);
+
+        $lastSyncedMember = [
+          'membershipNumber' => $result[0],
+          'emailOrUserName' => $result[1]
+        ];
+      }
     } else {
       $lastSyncedMember = null;
     }
 
     return $lastSyncedMember;
+  }
+
+  /**
+   * Sets the latest synced member
+   * 
+   * @param array $memberData
+   */
+  public function setLatestSyncedMember($memberData): void
+  {
+    // Add current date
+    $memberData['synced_at'] = (new DateTime('now', new DateTimeZone('Europe/Berlin')))->format(DateTime::ATOM);
+
+    // Merge all data to JSON
+    $mergedData = json_encode($memberData);
+
+    // Save to DB
+    $this->db->query(
+      $this->db->prepare(
+        "UPDATE `" . $this->db->prefix . "bcc_options` SET 
+        `value` = %s 
+        WHERE `" . $this->db->prefix . "bcc_options`.`identifier` = 'ev_bc_sync_last_new';",
+        [$mergedData]
+      )
+    );
   }
 
   public function getMemberDetails($member): object

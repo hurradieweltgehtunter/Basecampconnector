@@ -245,13 +245,16 @@ class Bcc_Public {
 		// Check, if we have an EasyVerein ApiToken
 		try {
 			$evClient = new EasyVereinClient();
-			$EvApiToken = EasyVereinClient::getOption('bcc_ev_api_token');
+			$EvApiToken = EasyVereinClient::getOption('ev_api_token');
+
 			if ($EvApiToken === '' || $EvApiToken === NULL) {
+				echo 'No EasyVerein API Token found. Trying to retrieve one ...';
 				$EvApiToken = $evClient->refreshApiToken();
 			}
 		} catch (\Exception $e) {
 			wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Error while retrieving EasyVerein API Token' . "\r\n" . print_r($e, true));
-			exit();
+			
+			throw new \Exception('Error while retrieving EasyVerein API Token: ' . $e->getMessage());
 		}
 
 		// Get all members ordered by joinDate DESC
@@ -259,11 +262,12 @@ class Bcc_Public {
 			$members = $evClient->getMembers('ordering=-joinDate&limit=25');
 		} catch (\Exception $e) {
 			wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Error while retrieving member list from EasyVerein:' . $e->getMessage() . "\r\n");
-			exit();
+
+			throw new \Exception('Error while retrieving member list from EasyVerein'. $e->getMessage());
 		}
 		
 		// Get data of last synced member
-		$latestSyncedMember = $evClient->getLatestSyncedMember();	
+		$latestSyncedMember = $evClient->getLatestSyncedMember();
 
 		$message = get_option('bcc_ev_welcome_text');
 
@@ -281,8 +285,8 @@ class Bcc_Public {
 				$log .= "\r\n" . 'Syncing ' . $member->emailOrUserName;
 
 				// ... until we reached the last synced member
-				if ($member->emailOrUserName === $latestSyncedMember['username']) {
-					$log .= "\r\n" . 'Member is already synced: ' . $latestSyncedMember['username'];
+				if ($member->emailOrUserName === $latestSyncedMember['emailOrUserName']) {
+					$log .= "\r\n" . 'Member is already synced: ' . $latestSyncedMember['emailOrUserName'];
 					break;
 				}
 
@@ -294,7 +298,7 @@ class Bcc_Public {
 
 				// Get the members details
 				$memberDetails = $evClient->getMemberDetails($member);
-
+				
 				// Create the account and add it to PP general project
 				$data = $bclient->people()->create([
 					'email' => $memberDetails->primaryEmail,
@@ -335,17 +339,14 @@ class Bcc_Public {
 				}
 
 				// Store the newest synced member
-				$result = $wpdb->update(
-					"{$wpdb->base_prefix}bcc_options", 
-					array(
-						'value' => $member->membershipNumber . '|' . $member->emailOrUserName
-					), 
-					array(
-						'identifier' => 'ev_bc_sync_last_new'
-					),
-					array('%s'),
-					array('%s')
-				);
+				$latestSyncedMember = $evClient->setLatestSyncedMember([
+					'membershipNumber' => $member->membershipNumber,
+					'firstName' => $memberDetails->firstName,
+					'lastName' => $memberDetails->lastName,
+					'privateEmail' => $memberDetails->privateEmail,
+					'joinDate' => $member->joinDate,
+					'emailOrUserName' => $member->emailOrUserName
+				]);
 
 				$log .= "\r\n" . 'Added ' . $member->emailOrUserName;
 			}
