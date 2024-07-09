@@ -51,6 +51,13 @@
         // Zum Schluß, löschen der Session.
         session_destroy();
     endif;
+
+
+    if ($_GET['sync'] && $_GET['sync'] === 'success') : ?>
+        <div class="alert alert-success" role="alert">
+            Sync was successful
+        </div>
+    <?php endif;
     ?>
 
     <div class="col-md-6">

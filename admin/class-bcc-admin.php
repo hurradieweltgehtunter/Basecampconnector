@@ -148,6 +148,9 @@ class Bcc_Admin {
 	public function handle_manual_sync()
 	{
 		do_action('easy_verein_basecamp_sync');
+		
+		wp_redirect(admin_url('admin.php?page=Basecamp+Connector&sync=success'));
+    exit;
 	}
 
 	public function setupSettingsMenu() {
