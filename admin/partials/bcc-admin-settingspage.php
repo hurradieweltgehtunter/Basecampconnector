@@ -105,23 +105,55 @@
                             <tbody>
                                 <tr>
                                     <td>Name</td>
-                                    <td><?php echo $latestSyncedMember['firstName'] . ' ' . $latestSyncedMember['familyName']; ?></td>
+                                    <td><?php 
+                                    if ($latestSyncedMember['firstName'] === null || $latestSyncedMember['familyName'] === null) {
+                                        echo '-';
+                                    } else {
+                                        echo $latestSyncedMember['firstName'] . ' ' . $latestSyncedMember['familyName']; 
+                                    }
+                                    ?></td>
                                 </tr>
                                 <tr>
                                     <td>Email</td>
-                                    <td><?php echo $latestSyncedMember['emailOrUserName']; ?></td>
+                                    <td><?php 
+                                    if ($latestSyncedMember['emailOrUserName'] === null) {
+                                        echo '-';
+                                    } else {
+                                        echo $latestSyncedMember['emailOrUserName']; 
+                                    }
+                                    ?></td>
                                 </tr>
                                 <tr>
                                     <td>Membership Number</td>
-                                    <td><?php echo $latestSyncedMember['membershipNumber']; ?></td>
+                                    <td><?php 
+                                    if ($latestSyncedMember['membershipNumber'] === null) {
+                                        echo '-';
+                                    } else {
+                                        echo $latestSyncedMember['membershipNumber'];
+                                    }
+                                    ?>
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td>Join Date</td>
-                                    <td><?php echo date('d.m.Y', strtotime($latestSyncedMember['joinDate'])); ?></td>
+                                    <td><?php 
+                                    if ($latestSyncedMember['joinDate'] === null) {
+                                        echo '-';
+                                    } else {
+                                        echo date('d.m.Y', strtotime($latestSyncedMember['joinDate']));
+                                    }
+                                    ?>
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td>Sync Date</td>
-                                    <td><?php echo date('d.m.Y', strtotime($latestSyncedMember['synced_at'])); ?></td>
+                                    <td><?php 
+                                    if ($latestSyncedMember['synced_at'] === null) {
+                                        echo '-';
+                                    } else {
+                                        echo date('d.m.Y', strtotime($latestSyncedMember['synced_at']));
+                                    }
+                                    ?></td>
                                 </tr>
                             </tbody>
                         </table>
