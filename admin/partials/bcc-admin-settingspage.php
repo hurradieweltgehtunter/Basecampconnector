@@ -159,6 +159,19 @@
                         </table>
                     </td>
                 </tr>
+                <tr scope="row">
+                    <td>
+                        <div class="wrap">
+                            Star Sync manually
+                            <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
+                                <input type="hidden" name="action" value="manual_sync">
+                                <?php submit_button('Basecamp Sync manuell starten', 'primary', 'manual_sync'); ?>
+                            </form>
+                        </div>
+                    </td>
+                    <td>
+                        &nbsp;
+                    </td>
             </tbody>
         </table>
     </div>

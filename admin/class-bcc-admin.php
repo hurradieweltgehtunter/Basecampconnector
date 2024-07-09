@@ -141,6 +141,15 @@ class Bcc_Admin {
 		);
 	}
 
+	/**
+	 * Handle the manual sync action
+	 * Hook: admin_post_manual_sync
+	 */
+	public function handle_manual_sync()
+	{
+		do_action('easy_verein_basecamp_sync');
+	}
+
 	public function setupSettingsMenu() {
 		add_menu_page(
 			$this->plugin_name,
