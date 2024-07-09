@@ -16,5 +16,17 @@ class BCC_Exception_Handler {
         3,
         $error_log
     );
+
+    wp_mail(
+        'debugplatzprojekt@florianlenz.com',
+        'Basecamp Connector Exception',
+        sprintf(
+            "Exception: %s in %s on line %d\nStack trace:\n%s",
+            $exception->getMessage(),
+            $exception->getFile(),
+            $exception->getLine(),
+            $exception->getTraceAsString()
+        )
+    );
   }
 }
