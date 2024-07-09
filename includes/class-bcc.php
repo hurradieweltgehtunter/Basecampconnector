@@ -67,6 +67,7 @@ class Bcc {
 	 * @since    1.0.0
 	 */
 	public function __construct() {
+
 		if ( defined( 'BCC_VERSION' ) ) {
 			$this->version = BCC_VERSION;
 		} else {
@@ -74,7 +75,11 @@ class Bcc {
 		}
 		$this->plugin_name = 'Basecamp Connector';
 
+		
 		$this->load_dependencies();
+		
+		set_exception_handler(array('BCC_Exception_Handler', 'handle_exception'));
+		
 		$this->set_locale();
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
@@ -126,6 +131,11 @@ class Bcc {
 		 * The class responsible for defining AJAX actions
 		 */
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-bcc-ajax.php';
+
+		/**
+		 * The class responsible for handling Exceptions
+		 */
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-bcc-exception-handler.php';
 
 		require plugin_dir_path( dirname( __FILE__ ) ) . '/vendor/autoload.php';
 		require_once(plugin_dir_path(__FILE__) . '/../includes/BasecampClient.php');
