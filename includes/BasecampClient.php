@@ -187,8 +187,19 @@ if( ! class_exists( 'BClient' ) ){
             $hash = $storage->createHash($method, $resource, $params);
             $etag = $storage->get($hash);
 
-            if ($etag) {
-                $this->headers[] = 'If-None-Match: '.$etag;
+            $eTagHeaderValue = 'If-None-Match: '.$etag;
+
+            // Make sure etag does not get included multiple times.
+            $etagExists = false;
+            foreach ($this->headers as $header) {
+                if (strpos($header, $eTagHeaderValue) !== false) {
+                    $etagExists = true;
+                    break;
+                }
+            }
+
+            if ($etag && !$etagExists) {
+                $this->headers[] = $etagHeaderValue;
             }
 
             $message = new Request($method, $resource, self::BASE_URL.$this->getAccountData()['accountId']);
