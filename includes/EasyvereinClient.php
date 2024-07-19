@@ -25,7 +25,7 @@ class EasyVereinClient {
     $this->db = $wpdb;
 
     $this->debug = $debug;
-    $this->api_token = $this->db->get_var('SELECT `value` FROM ' . $this->db->prefix . 'bcc_options WHERE `identifier` = "ev_api_token"');
+    // $this->api_token = $this->db->get_var('SELECT `value` FROM ' . $this->db->prefix . 'bcc_options WHERE `identifier` = "ev_api_token"');
     $this->client = new GuzzleHttp\Client();
   }
 
@@ -33,9 +33,9 @@ class EasyVereinClient {
    * Method to read option values from plugin table bcc_options (not to be confused with get_option() function from WP core reading from wp_options table)
    * 
    * @param string $option
-   * @return string
+   * @return string or null
    */
-  public static function getOption ($option): string
+  public static function getOption ($option): ?string
   {
     global $wpdb;
     return $wpdb->get_var('SELECT `value` FROM ' . $wpdb->prefix . 'bcc_options WHERE `identifier` = "' . $option . '"');
@@ -48,36 +48,42 @@ class EasyVereinClient {
     $headers = [
       'Authorization' => 'Bearer ' . get_option('bcc_ev_api_key')
     ];
-    
-    $response = $this->client->request('GET', $url, [
-      'headers' => $headers
-    ]);
+
+    try {
+      $response = $this->client->request('GET', $url, [
+        'headers' => $headers
+      ]);
+    } catch (Exception $e) {
+      throw new Exception('Could not refresh API token: ' . $e->getMessage());
+    }
 
     $responseBody = $response->getBody()->getContents();
     $result = json_decode($responseBody, true);
-    
+
     if (isset($result['Bearer'])) {
-      $this->db->query($this->db->prepare("UPDATE `" . $this->db->prefix . "bcc_options` SET `value` = %s WHERE `" . $this->db->prefix . "bcc_options`.`identifier` = 'ev_api_token';", array($result['Bearer'])));
+      update_option('bcc_ev_api_key', $result['Bearer']);
+      // $this->db->query($this->db->prepare("UPDATE `" . $this->db->prefix . "bcc_options` SET `value` = %s WHERE `" . $this->db->prefix . "bcc_options`.`identifier` = 'ev_api_token';", array($result['Bearer'])));
       return $result['Bearer'];
     } else {
       
       // Throw
-      throw new Exception('Could not refresh API token');
+      throw new Exception('Could not refresh API token, no Bearer token found in response.');
     }
   }
 
   public function getMembers($filterString): array
   {
-    $url = get_option('bcc_ev_api_url') . 'member/?' . $filterString;
+    $url = get_option('bcc_ev_api_url') . 'member?' . $filterString;
 
-		$response = $this->client->request('GET', $url, [
-			'headers' => [
-				'Authorization' => 'Bearer ' . get_option('bcc_ev_api_key')
-			]
-		]);
+    $response = $this->client->request('GET', $url, [
+      'headers' => [
+        'Authorization' => 'Bearer ' . get_option('bcc_ev_api_key')
+      ]
+    ]);
 
     // Check header if tokenRefreshNeeded is true
     $tokenRefreshNeeded = $response->getHeader('tokenRefreshNeeded');
+
     if ($tokenRefreshNeeded[0] === 'true') {
       $this->refreshApiToken();
     }

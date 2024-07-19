@@ -314,7 +314,7 @@
         
         <div class="row mb-3">
             <div class="col-md-6">                
-                <label for="bcc_ev_api_key" class="form-label">EasyVerein API KEY</label>
+                <label for="bcc_ev_api_key" class="form-label">EasyVerein API Token</label>
                 <input type="password" class="form-control" name="bcc_ev_api_key" value="<?php echo esc_attr( get_option('bcc_ev_api_key') ); ?>" />
             </div>
         </div>

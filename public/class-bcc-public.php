@@ -252,7 +252,7 @@ class Bcc_Public {
 		// Check, if we have an EasyVerein ApiToken
 		try {
 			$evClient = new EasyVereinClient();
-			$EvApiToken = EasyVereinClient::getOption('ev_api_token');
+			$EvApiToken = get_option('bcc_ev_api_token');
 
 			if ($EvApiToken === '' || $EvApiToken === NULL) {
 				$EvApiToken = $evClient->refreshApiToken();
@@ -265,11 +265,26 @@ class Bcc_Public {
 		try {
 			$this->log('Getting members from EasyVerein');
 			$members = $evClient->getMembers('ordering=-joinDate&limit=25');
+
 			$this->log('Got ' . count($members) . ' members from EasyVerein');
 		} catch (\Exception $e) {
-			throw new \Exception('Error while retrieving member list from EasyVerein'. $e->getMessage());
+
+			// if status is 401, refresh api token
+			if ($e->getCode() === 401) {
+				$this->log('Received 401 from EasyVerein. Refreshing API Token');
+
+				try {
+					$EvApiToken = $evClient->refreshApiToken();
+					$members = $evClient->getMembers('ordering=-joinDate&limit=25');
+				} catch (\Exception $e) {
+					throw new \Exception('Error while retrieving member list from EasyVerein'. $e->getMessage());
+				}
+
+			} else {
+				throw new \Exception('Error while retrieving member list from EasyVerein'. $e->getMessage());
+			}
 		}
-		
+
 		// Get data of last synced member
 		try {
 			$this->log('Getting latest synced member from EasyVerein');
@@ -313,13 +328,15 @@ class Bcc_Public {
 				$this->log('Getting member details from EasyVerein');
 				$memberDetails = $evClient->getMemberDetails($member);
 				$this->log('Got member details');
-				continue;
+
 				// Create the account and add it to PP general project
 				$this->log('Granting ' . $member->emailOrUserName . ' to project ' . get_option('bcc_ev_project_id'));
+				$this->log('Email: ' . $memberDetails->primaryEmail . ', Name: ' . $memberDetails->name . ', Company: ' . $memberDetails->companyName);
+
 				$data = $bclient->people()->create([
 					'email' => $memberDetails->primaryEmail,
 					'name' => $memberDetails->name,
-					'company' => $memberDetails->companyName,
+					'company' => '',
 					'title' => ''
 				], get_option('bcc_ev_project_id'));
 
@@ -370,10 +387,9 @@ class Bcc_Public {
 			throw new \Exception('Error while syncing members from EasyVerein to Basecamp: ' . $e->getMessage());
 		} finally {
 			// Store log with timestamp in plugins /log directory
-			$logFile = plugin_dir_path( dirname( __FILE__ ) ) . 'log/sync.log';
+			$logFile = plugin_dir_path( dirname( __FILE__ ) ) . 'log/' . date('Y-m-d H:i:s') . '.log';
 			
-			$log = "\r\n";
-			$log .= date('Y-m-d H:i:s') . "\r\n";
+			$log = '';
 
 			foreach($this->log as $entry) {
 				$log .= $entry['level'] . ': ' . $entry['message'] . "\r\n";
@@ -381,6 +397,10 @@ class Bcc_Public {
 			
 			// Append log to file
 			file_put_contents($logFile, $log, FILE_APPEND);
+			echo '<pre>';
+			print_r($log);
+			echo '</pre>';
+			
 		}
 	}
 
