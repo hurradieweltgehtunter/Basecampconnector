@@ -189,17 +189,20 @@ if( ! class_exists( 'BClient' ) ){
 
             $eTagHeaderValue = 'If-None-Match: '.$etag;
 
-            // Make sure etag does not get included multiple times.
-            $etagExists = false;
-            foreach ($this->headers as $header) {
-                if (strpos($header, $eTagHeaderValue) !== false) {
-                    $etagExists = true;
-                    break;
-                }
-            }
+            // If an ETag exists, remove it and replace by the new one
+            if ($etag) {
 
-            if ($etag && !$etagExists) {
-                $this->headers[] = $etagHeaderValue;
+                $etagExists = false;
+                foreach ($this->headers as $key => $header) {
+                    if (strpos($header, 'If-None-Match') !== false) {
+                        $this->headers[$key] = $eTagHeaderValue;
+                        $etagExists = true;
+                    }
+                }
+                
+                if (!$etagExists) {
+                    $this->headers[] = $eTagHeaderValue;
+                }
             }
 
             $message = new Request($method, $resource, self::BASE_URL.$this->getAccountData()['accountId']);
