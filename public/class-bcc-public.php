@@ -226,6 +226,7 @@ class Bcc_Public {
 	 */
 	public function easy_verein_basecamp_sync() {
 		global $wpdb;
+		$error = false;
 
 		if (get_option('bcc_ev_api_key') === '' || get_option('bcc_ev_api_key') === false || 
 			get_option('bcc_ev_api_url') === '' || get_option('bcc_ev_api_url') === false ||
@@ -261,6 +262,15 @@ class Bcc_Public {
 			throw new \Exception('Error while retrieving EasyVerein API Token: ' . $e->getMessage());
 		}
 
+		// Get data of last synced member
+		try {
+			$this->log('Getting latest synced member');
+			$latestSyncedMember = $evClient->getLatestSyncedMember();
+			$this->log('Got latest synced member: ' . print_r($latestSyncedMember, true));
+		} catch (\Exception $e) {
+			throw new \Exception('Error while getting latest synced member'. $e->getMessage());
+		}	
+
 		// Get all members ordered by joinDate DESC
 		try {
 			$this->log('Getting members from EasyVerein');
@@ -285,19 +295,28 @@ class Bcc_Public {
 			}
 		}
 
-		// Get data of last synced member
-		try {
-			$this->log('Getting latest synced member from EasyVerein');
-			$latestSyncedMember = $evClient->getLatestSyncedMember();
-			$this->log('Got latest synced member from EasyVerein: ' . print_r($latestSyncedMember, true));
-		} catch (\Exception $e) {
-			throw new \Exception('Error while retrieving latest synced member from EasyVerein'. $e->getMessage());
+		// Create a list of members that are not yet synced
+		$this->log('Creating list of members that are not yet synced');
+		$notSyncedMembers = [];
+		foreach ($members as $member) {
+			if (!isset($member->membershipNumber) || is_null($member->membershipNumber) || $member->membershipNumber === '') {
+				//Only accepted/paid members have a membershipNumber; Others are prospects and shoud not get access to basecamp
+				continue;
+			}
+
+			if ($member->emailOrUserName === $latestSyncedMember['emailOrUserName']) {
+				break;
+			}
+
+			$notSyncedMembers[] = $member;
+		}
+
+		foreach($notSyncedMembers as $member) {
+			$this->log($member->emailOrUserName);
 		}
 
 		$message = get_option('bcc_ev_welcome_text');
 		$this->log('Got welcome message text');
-
-		$bclient = new BClient();
 
 		$additionalProjects = explode(',', get_option('bcc_ev_project_id_additional'));
 
@@ -305,40 +324,35 @@ class Bcc_Public {
 			$additionalProjects = [];
 		}
 		
+		$projectIdHQ = get_option('bcc_ev_project_id');
+		$welcomeMessageId = get_option('bcc_ev_welcome_text_message_id');
+		
+		$bclient = new BClient();
 		$this->log('Starting Sync Process');
 
 		try {
 			// Iterate over new members ...
-			foreach($members as $member) {
+			foreach($notSyncedMembers as $member) {
 				$this->log('Syncing ' . $member->emailOrUserName);
-
-				// ... until we reached the last synced member
-				if ($member->emailOrUserName === $latestSyncedMember['emailOrUserName']) {
-					$this->log('Member is already synced: ' . $latestSyncedMember['emailOrUserName']);
-					break;
-				}
-
-				if (!isset($member->membershipNumber) || is_null($member->membershipNumber) || $member->membershipNumber === '') {
-					//Only accepted/paid members have a membershipNumber; Others are prospects and shoud not get access to basecamp
-					$this->log('Not a full member (No membership number). Skipping.');
-					continue;
-				}
 
 				// Get the members details
 				$this->log('Getting member details from EasyVerein');
 				$memberDetails = $evClient->getMemberDetails($member);
-				$this->log('Got member details');
-
+				$this->log('Got member details');				
+				
 				// Create the account and add it to PP general project
-				$this->log('Granting ' . $member->emailOrUserName . ' to project ' . get_option('bcc_ev_project_id'));
-				$this->log('Email: ' . $memberDetails->primaryEmail . ', Name: ' . $memberDetails->name . ', Company: ' . $memberDetails->companyName);
-
-				$data = $bclient->people()->create([
+				$this->log('Granting ' . $member->emailOrUserName . ' to project ' . $projectIdHQ);
+				
+				$payload = [
 					'email' => $memberDetails->primaryEmail,
 					'name' => $memberDetails->name,
 					'company' => '',
 					'title' => ''
-				], get_option('bcc_ev_project_id'));
+				];
+				
+				$this->log('payload: ' . print_r($payload, true));
+
+				$data = $bclient->people()->create($payload, $projectIdHQ);
 
 				$this->log('Result: ' . print_r($data, true));
 				
@@ -346,7 +360,7 @@ class Bcc_Public {
 					$this->log('Could not create Basecamp account for ' . $member->emailOrUserName . ". Possibly already added to project? \r\n <pre>" . print_r($data, true) . '</pre>');
 				}
 
-				// Add user to additional projects (Halping hands etc.)
+				// Add user to additional projects (Helping hands etc.)
 				foreach($additionalProjects as $projectId) {
 					$this->log('Adding ' . $member->emailOrUserName . ' to additional project ' . $projectId);
 					$result = $bclient->people()->addToProject(trim($projectId), $data->granted[0]->id);				
@@ -362,7 +376,7 @@ class Bcc_Public {
 				if (count($data->granted) > 0) {
 					$userLink = '<bc-attachment sgid="' . $data->granted[0]->attachable_sgid . '"></bc-attachment>';
 					$message = str_replace('{user}', $userLink, $message);
-					$result = $bclient->comments()->create(get_option('bcc_ev_project_id'), get_option('bcc_ev_welcome_text_message_id'), array(
+					$result = $bclient->comments()->create($projectIdHQ, $welcomeMessageId, array(
 						'content' => $message
 					));
 
@@ -370,10 +384,10 @@ class Bcc_Public {
 				}
 
 				// Store the newest synced member
-				$latestSyncedMember = $evClient->setLatestSyncedMember([
+				$evClient->setLatestSyncedMember([
 					'membershipNumber' => $member->membershipNumber,
 					'firstName' => $memberDetails->firstName,
-					'lastName' => $memberDetails->lastName,
+					'familyName' => $memberDetails->familyName,
 					'privateEmail' => $memberDetails->privateEmail,
 					'joinDate' => $member->joinDate,
 					'emailOrUserName' => $member->emailOrUserName
@@ -383,8 +397,8 @@ class Bcc_Public {
 			}
 		} catch (\Exception $e) {
 			$this->log('Error while syncing members: ' . $e->getMessage(), 'error');
+			$error = true;
 			// wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Error while syncing members from EasyVerein to Basecamp: ' . $e->getMessage() . "\r\n" . $log);
-			throw new \Exception('Error while syncing members from EasyVerein to Basecamp: ' . $e->getMessage());
 		} finally {
 			// Store log with timestamp in plugins /log directory
 			$logFile = plugin_dir_path( dirname( __FILE__ ) ) . 'log/' . date('Y-m-d H:i:s') . '.log';
@@ -400,7 +414,10 @@ class Bcc_Public {
 			echo '<pre>';
 			print_r($log);
 			echo '</pre>';
-			
+
+			if (isset($error) && $error === true) {
+				throw new \Exception('Error while syncing members. Check log for details.');
+			}			
 		}
 	}
 
