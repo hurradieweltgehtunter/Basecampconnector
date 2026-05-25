@@ -1,5 +1,4 @@
 <?php
-
 /**
  * The public-facing functionality of the plugin.
  *
@@ -10,428 +9,429 @@
  * @subpackage Bcc/public
  */
 
-/**
- * The public-facing functionality of the plugin.
- *
- * Defines the plugin name, version, and two examples hooks for how to
- * enqueue the public-facing stylesheet and JavaScript.
- *
- * @package    Bcc
- * @subpackage Bcc/public
- * @author     Florian Lenz <hi@florianlenz.com>
- */
 class Bcc_Public {
 
-	/**
-	 * The ID of this plugin.
-	 *
-	 * @since    1.0.0
-	 * @access   private
-	 * @var      string    $plugin_name    The ID of this plugin.
-	 */
+	/** @var string */
 	private $plugin_name;
 
-	/**
-	 * The version of this plugin.
-	 *
-	 * @since    1.0.0
-	 * @access   private
-	 * @var      string    $version    The current version of this plugin.
-	 */
+	/** @var string */
 	private $version;
 
+	/** @var Bcc_Logger */
+	private $logger;
 
-	/**
-	 * The log of this plugin.
-	 *
-	 * @since    1.0.0
-	 * @access   private
-	 * @var      array    $log    The log of this plugin.
-	 */
-	private $log = [];
-
-	/**
-	 * Initialize the class and set its properties.
-	 *
-	 * @since    1.0.0
-	 * @param      string    $plugin_name       The name of the plugin.
-	 * @param      string    $version    The version of this plugin.
-	 */
 	public function __construct( $plugin_name, $version ) {
-
 		$this->plugin_name = $plugin_name;
-		$this->version = $version;
-
+		$this->version     = $version;
+		$this->logger      = new Bcc_Logger( 'sync' );
 	}
 
-	/**
-	 * Register the stylesheets for the public-facing side of the site.
-	 *
-	 * @since    1.0.0
-	 */
 	public function enqueue_styles() {
-
-		/**
-		 * This function is provided for demonstration purposes only.
-		 *
-		 * An instance of this class should be passed to the run() function
-		 * defined in Bcc_Loader as all of the hooks are defined
-		 * in that particular class.
-		 *
-		 * The Bcc_Loader will then create the relationship
-		 * between the defined hooks and the functions defined in this
-		 * class.
-		 */
-
 		global $post;
+		if ( ! isset( $post ) ) {
+			return;
+		}
 		$postType = $post->post_type;
-		if($postType == 'post' || $postType == 'page' && has_shortcode($post->post_content, 'BasecampForm'))
-		{
+		if ( $postType === 'post' || ( $postType === 'page' && has_shortcode( $post->post_content, 'BasecampForm' ) ) ) {
 			wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/bcc-public.css', array(), $this->version, 'all' );
 			wp_enqueue_style( 'bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css', array(), '5.0.0', 'all' );
 		}
-
 	}
 
-	/**
-	 * Register the JavaScript for the public-facing side of the site.
-	 *
-	 * @since    1.0.0
-	 */
 	public function enqueue_scripts() {
-
-		/**
-		 * This function is provided for demonstration purposes only.
-		 *
-		 * An instance of this class should be passed to the run() function
-		 * defined in Bcc_Loader as all of the hooks are defined
-		 * in that particular class.
-		 *
-		 * The Bcc_Loader will then create the relationship
-		 * between the defined hooks and the functions defined in this
-		 * class.
-		 */
-
 		global $post;
+		if ( ! isset( $post ) ) {
+			return;
+		}
 		$postType = $post->post_type;
-        if ($postType == 'post' || $postType == 'page' && has_shortcode($post->post_content, 'BasecampForm')) {
-			wp_enqueue_script($this->plugin_name, plugin_dir_url(__FILE__) . 'js/bcc-public.js', array( 'jquery' ), $this->version, false);
-			
-			wp_localize_script( $this->plugin_name, 'params', array(
-				'ajaxurl' 	=> admin_url( 'admin-ajax.php' ),
-				'nonce'    	=> wp_create_nonce( 'plugin' )
+		if ( $postType === 'post' || ( $postType === 'page' && has_shortcode( $post->post_content, 'BasecampForm' ) ) ) {
+			wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/bcc-public.js', array( 'jquery' ), $this->version, false );
+			wp_localize_script(
+				$this->plugin_name,
+				'params',
+				array(
+					'ajaxurl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'plugin' ),
 				)
 			);
-
-			wp_enqueue_script('bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js', array( 'jquery' ), '5.0.0', false);
-			wp_enqueue_script('GoogleCaptcha', 'https://www.google.com/recaptcha/api.js?render=6LeQGyYaAAAAAINGjzIYW3mMczOjXK33rvRV3vdo', array( 'jquery' ), '3', false);
-        }
+			wp_enqueue_script( 'bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js', array( 'jquery' ), '5.0.0', false );
+			wp_enqueue_script( 'GoogleCaptcha', 'https://www.google.com/recaptcha/api.js?render=6LeQGyYaAAAAAINGjzIYW3mMczOjXK33rvRV3vdo', array( 'jquery' ), '3', false );
+		}
 	}
 
 	public function BasecampFormFunc() {
 		ob_start();
 		include plugin_dir_path( __FILE__ ) . '/partials/bcc-public-display.php';
-		$output = ob_get_clean();
-		return $output;
+		return ob_get_clean();
 	}
 
 	/* WEBHOOKS */
 	public function rest_api_init() {
 		// Webhook for strawpolls.com
 		// Route is /wp-json/bcc/v1/webhook/
-		// See here: https://developer.wordpress.org/rest-api/extending-the-rest-api/adding-custom-endpoints/
-
-		register_rest_route( 'bcc/v1', '/webhook/', array(
-			'methods' => 'POST',
-			'callback' => array( $this, 'webhook' ),
-		) );
+		register_rest_route(
+			'bcc/v1',
+			'/webhook/',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'webhook' ),
+				'permission_callback' => '__return_true',
+			)
+		);
 	}
 
-	/**
-	 *
-	 * @since 1.0.0
-	 * @return void
-	 */
-	public function webhook(WP_REST_Request $request) {
+	public function webhook( WP_REST_Request $request ) {
 		global $wpdb;
-	
-		$event = $request->get_param('event');
-		$data = $request->get_param('data')['poll'];
-		
-		if ($event === 'deadline_poll') {
-			$poll_id = $data['id'];
 
+		$log      = new Bcc_Logger( 'webhook' );
+		$remoteIp = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '?';
+		$log->log( 'Webhook received from ' . $remoteIp, 'info' );
+
+		try {
+			$event = $request->get_param( 'event' );
+			$data  = $request->get_param( 'data' );
+			$data  = is_array( $data ) && isset( $data['poll'] ) ? $data['poll'] : null;
+			$log->log( 'event=' . (string) $event . ' poll_id=' . ( is_array( $data ) ? (string) ( $data['id'] ?? '?' ) : '?' ) );
+
+			if ( $event !== 'deadline_poll' || ! is_array( $data ) || ! isset( $data['id'] ) ) {
+				$log->log( 'Rejecting: unsupported event or missing poll id', 'warning' );
+				$log->flush();
+				return new WP_REST_Response( array( 'ok' => false ), 400 );
+			}
+
+			$poll_id     = (string) $data['id'];
 			$bcMessageId = $wpdb->get_var(
 				$wpdb->prepare(
-					"SELECT bc_message_id FROM `" . $wpdb->prefix . "bcc_projects` WHERE poll_content_id = %s",
-            		$poll_id
+					"SELECT bc_message_id FROM `{$wpdb->prefix}bcc_projects` WHERE poll_content_id = %s",
+					$poll_id
 				)
 			);
+			if ( $bcMessageId === null ) {
+				$log->log( "Unknown poll {$poll_id} (no bcc_projects row)", 'warning' );
+				$log->flush();
+				return new WP_REST_Response(
+                    array(
+						'ok'     => false,
+						'reason' => 'unknown poll',
+                    ),
+                    404 
+                );
+			}
 
-			// Post voting results on basecamp
-            $client = new BClient();
+			$client = new Basecamp3Client();
 
+			$options    = array();
 			$totalCount = 0;
-
-			$options = [];
-			foreach($data['poll_options'] as $option) {
-				$options[$option['value']] = $option['vote_count'];
-				$totalCount = $totalCount + $option['vote_count'];
+			foreach ( $data['poll_options'] as $option ) {
+				$options[ $option['value'] ] = (int) $option['vote_count'];
+				$totalCount                 += (int) $option['vote_count'];
 			}
-
-			if ($options['Ja'] > $options['Nein']) {
-				$win = true;
-			} else {
-				$win = false;
-			}
+			$win = ( $options['Ja'] ?? 0 ) > ( $options['Nein'] ?? 0 );
+			$log->log( 'Vote counts: Ja=' . ( $options['Ja'] ?? 0 ) . ' Nein=' . ( $options['Nein'] ?? 0 ) . ' Enthaltung=' . ( $options['Enthaltung'] ?? 0 ) . ' win=' . ( $win ? 'yes' : 'no' ) );
 
 			ob_start();
-            include plugin_dir_path(__FILE__) . 'partials/bcc-basecamp-template-comment-votingended.php';
-            $comment = ob_get_clean();
+			include plugin_dir_path( __FILE__ ) . 'partials/bcc-basecamp-template-comment-votingended.php';
+			$comment = ob_get_clean();
 
-			$client->comments()->create(get_option('bcc_b3_project_id'), $bcMessageId, array(
-				'content' => $comment
-			));
+			$client->createComment(
+				(int) get_option( 'bcc_b3_project_id' ),
+				(int) $bcMessageId,
+				array( 'content' => $comment )
+			);
+			$log->log( "Posted result comment to Basecamp message {$bcMessageId}" );
 
-			// Complete the initial todo
 			$bcTodoId = $wpdb->get_var(
 				$wpdb->prepare(
-					"SELECT bc_todo_id FROM `" . $wpdb->prefix . "bcc_projects` WHERE poll_content_id = %s",
-            		$poll_id
+					"SELECT bc_todo_id FROM `{$wpdb->prefix}bcc_projects` WHERE poll_content_id = %s",
+					$poll_id
 				)
 			);
+			if ( $bcTodoId !== null ) {
+				$client->completeTodo( (int) get_option( 'bcc_b3_project_id' ), (int) $bcTodoId );
+				$log->log( "Completed Basecamp todo {$bcTodoId}" );
+			}
 
-			$client->todos()->complete(get_option('bcc_b3_project_id'), $bcTodoId);
+			$spApiKey = (string) get_option( 'bcc_sp_api_key' );
+			if ( $spApiKey !== '' ) {
+				try {
+					$sp     = new \GuzzleHttp\Client(
+                        array(
+							'timeout'     => 15,
+							'http_errors' => false,
+                        ) 
+                    );
+					$spResp = $sp->delete(
+						'https://api.strawpoll.com/v2/polls/' . $poll_id,
+						array( 'headers' => array( 'X-API-KEY' => $spApiKey ) )
+					);
+					$status = $spResp->getStatusCode();
+					if ( $status >= 200 && $status < 300 ) {
+						$log->log( "Deleted Strawpoll {$poll_id}" );
+					} else {
+						// Strawpoll's API only supports session-cookie auth for DELETE
+						// as of mid-2026 — X-API-KEY returns 403. We log it but
+						// don't escalate because polls expire on their own.
+						$log->log( "Strawpoll delete {$poll_id} returned HTTP {$status} (best-effort, ignoring): " . substr( (string) $spResp->getBody(), 0, 200 ), 'warning' );
+					}
+				} catch ( \Throwable $e ) {
+					$log->log( 'Strawpoll delete failed (best-effort, ignoring): ' . $e->getMessage(), 'warning' );
+				}
+			}
 
-			// Delete Poll
-			$client = new \GuzzleHttp\Client();
-			$response = $client->delete('https://api.strawpoll.com/v2/polls/' . $poll_id, [
-				'headers' => [
-					'X-API-KEY' => get_option('bcc_sp_api_key'),
-				]
-			]);
-			
-			// Remove from DB
 			$wpdb->delete( $wpdb->prefix . 'bcc_projects', array( 'poll_content_id' => $poll_id ) );
+			$log->log( 'Removed bcc_projects row, done.' );
+			$log->flush();
+
+			return new WP_REST_Response( array( 'ok' => true ) );
+		} catch ( \Throwable $e ) {
+			$log->log( 'Webhook failed: ' . $e->getMessage() . ' @' . $e->getFile() . ':' . $e->getLine(), 'error' );
+			$logFile = $log->flush();
+			Bcc_Notifier::sendError(
+                'webhook',
+                $e->getMessage(),
+                array(
+					'exception' => $e,
+					'log_file'  => (string) $logFile,
+                ) 
+            );
+			return new WP_REST_Response(
+                array(
+					'ok'     => false,
+					'reason' => 'internal error',
+                ),
+                500 
+            );
 		}
 	}
 
 	/**
-	 *
-	 * Syncs newly added club members from EasyVerein to Basecamp. As sson as a member is marked as valid mamber in EasyVerein
-	 * he/she gets an account on Basecamp and gets access to a default thread (see option bcc_ev_api_key)
-	 * 
-	 * @since 1.0.0
-	 * @return void
+	 * Syncs newly added members from easyVerein to Basecamp. Triggered by the
+	 * `easy_verein_basecamp_sync` action (WP-Cron once a day, or the manual
+	 * sync button on the settings page).
 	 */
 	public function easy_verein_basecamp_sync() {
-		global $wpdb;
-		$error = false;
-
-		if (get_option('bcc_ev_api_key') === '' || get_option('bcc_ev_api_key') === false || 
-			get_option('bcc_ev_api_url') === '' || get_option('bcc_ev_api_url') === false ||
-			get_option('bcc_ev_project_id') === '' || get_option('bcc_ev_project_id') === false
-		) {
-			$missingParams = [];
-			if (get_option('bcc_ev_api_key') === '' || get_option('bcc_ev_api_key') === false) {
-				$missingParams[] = 'bcc_ev_api_key';
-			}
-
-			if (get_option('bcc_ev_api_url') === '' || get_option('bcc_ev_api_url') === false) {
-				$missingParams[] = 'bcc_ev_api_url';
-			}
-
-			if (get_option('bcc_ev_project_id') === '' || get_option('bcc_ev_project_id') === false) {
-				$missingParams[] = 'bcc_ev_project_id';
-			}
-
-			throw new \Exception('One or more of the required parameters is not set: ' . implode(', ', $missingParams) . ' | Check BasecampConnector Settings.');
-		}
-		
-		$client = new \GuzzleHttp\Client();
-
-		// Check, if we have an EasyVerein ApiToken
-		try {
-			$evClient = new EasyVereinClient();
-			$EvApiToken = get_option('bcc_ev_api_token');
-
-			if ($EvApiToken === '' || $EvApiToken === NULL) {
-				$EvApiToken = $evClient->refreshApiToken();
-			}
-		} catch (\Exception $e) {
-			throw new \Exception('Error while retrieving EasyVerein API Token: ' . $e->getMessage());
+		$mutex = new Bcc_Mutex( 'easy_verein_sync' );
+		if ( ! $mutex->acquire() ) {
+			$this->logger->log( 'Sync skipped: another run is in progress.', 'info' );
+			$this->logger->flush();
+			return;
 		}
 
-		// Get data of last synced member
+		// Always prune old logs at the start of a run — cheap and self-healing.
+		$pruned = $this->logger->pruneOldLogs();
+		if ( $pruned > 0 ) {
+			$this->logger->log( "Pruned {$pruned} old log file(s) (>" . Bcc_Logger::RETENTION_DAYS . ' days).', 'info' );
+		}
+
 		try {
-			$this->log('Getting latest synced member');
+			$this->assertRequiredOptions();
+
+			$evClient         = new EasyVereinClient();
+			$bcClient         = new Basecamp3Client();
+			$projectIdHQ      = (int) get_option( 'bcc_ev_project_id' );
+			$additional       = array_filter(
+				array_map(
+					'intval',
+					array_map( 'trim', explode( ',', (string) get_option( 'bcc_ev_project_id_additional', '' ) ) )
+				)
+			);
+			$welcomeText      = (string) get_option( 'bcc_ev_welcome_text', '' );
+			$welcomeMessageId = (int) get_option( 'bcc_ev_welcome_text_message_id', 0 );
+
+			$this->logger->log( 'Getting latest synced member' );
 			$latestSyncedMember = $evClient->getLatestSyncedMember();
-			$this->log('Got latest synced member: ' . print_r($latestSyncedMember, true));
-		} catch (\Exception $e) {
-			throw new \Exception('Error while getting latest synced member'. $e->getMessage());
-		}	
+			$this->logger->log( 'Got latest synced member: ' . wp_json_encode( $latestSyncedMember ) );
 
-		// Get all members ordered by joinDate DESC
-		try {
-			$this->log('Getting members from EasyVerein');
-			$members = $evClient->getMembers('ordering=-joinDate&limit=25');
-
-			$this->log('Got ' . count($members) . ' members from EasyVerein');
-		} catch (\Exception $e) {
-
-			// if status is 401, refresh api token
-			if ($e->getCode() === 401) {
-				$this->log('Received 401 from EasyVerein. Refreshing API Token');
-
-				try {
-					$EvApiToken = $evClient->refreshApiToken();
-					$members = $evClient->getMembers('ordering=-joinDate&limit=25');
-				} catch (\Exception $e) {
-					throw new \Exception('Error while retrieving member list from EasyVerein'. $e->getMessage());
-				}
-
-			} else {
-				throw new \Exception('Error while retrieving member list from EasyVerein'. $e->getMessage());
+			// Safety guard: pointer must identify the last synced member by
+			// either id (preferred — invariant) or email_or_user_name (legacy
+			// fallback for state created by plugin <= 1.x). Without either,
+			// the break-condition can never fire and we would bulk-grant
+			// every member in the fetch page.
+			if (
+				! is_array( $latestSyncedMember )
+				|| ( empty( $latestSyncedMember['id'] ) && empty( $latestSyncedMember['email_or_user_name'] ) )
+			) {
+				throw new Exception(
+					'Refusing to sync: ev_bc_sync_last_new is empty or missing both id and email_or_user_name. '
+					. 'Set the pointer manually before the first sync to avoid bulk-granting existing members.'
+				);
 			}
+
+			$this->logger->log( 'Fetching members from easyVerein' );
+			$members = $evClient->getNewestMembers( 25 );
+			$this->logger->log( 'Got ' . count( $members ) . ' members from easyVerein' );
+
+			$pointerFound     = false;
+			$notSyncedMembers = $this->collectNewMembers( $members, $latestSyncedMember, $pointerFound );
+			$this->logger->log( 'Identified ' . count( $notSyncedMembers ) . ' member(s) to sync (pointer ' . ( $pointerFound ? 'matched' : 'not in window' ) . ')' );
+
+			// Refuse to proceed if the pointer was not found in the fetched
+			// window. Using an explicit found-flag (not a count comparison)
+			// matters: prospects, resigned members or other skipped rows
+			// would otherwise mask the overrun and let us bulk-grant the
+			// remaining valid rows.
+			if ( ! $pointerFound ) {
+				$ident = $latestSyncedMember['id'] ?? $latestSyncedMember['email_or_user_name'] ?? '?';
+				throw new Exception(
+					'Refusing to sync: pointer "' . $ident
+					. '" was not found in the most recent ' . count( $members )
+					. ' members. Either the window was overrun or the pointer is stale; '
+					. 'fix the pointer manually before retrying.'
+				);
+			}
+
+			foreach ( $notSyncedMembers as $member ) {
+				$this->syncMember( $member, $bcClient, $evClient, $projectIdHQ, $additional, $welcomeText, $welcomeMessageId );
+			}
+		} catch ( \Throwable $e ) {
+			$this->logger->log( 'Sync failed: ' . $e->getMessage() . ' @' . $e->getFile() . ':' . $e->getLine(), 'error' );
+			$logFile = $this->logger->flush();
+			$mutex->release();
+
+			Bcc_Notifier::sendError(
+				'sync',
+				$e->getMessage(),
+				array(
+					'exception' => $e,
+					'log_file'  => (string) $logFile,
+                )
+			);
+
+			throw new Exception( 'Sync failed (see ' . basename( (string) $logFile ) . '): ' . $e->getMessage(), 0, $e );
 		}
 
-		// Create a list of members that are not yet synced
-		$this->log('Creating list of members that are not yet synced');
-		$notSyncedMembers = [];
-		foreach ($members as $member) {
-			if (!isset($member->membershipNumber) || is_null($member->membershipNumber) || $member->membershipNumber === '') {
-				//Only accepted/paid members have a membershipNumber; Others are prospects and shoud not get access to basecamp
-				continue;
-			}
+		$this->logger->flush();
+		$mutex->release();
+	}
 
-			if ($member->emailOrUserName === $latestSyncedMember['emailOrUserName']) {
+	/**
+	 * Throws if any of the required plugin options are unset/empty.
+	 */
+	private function assertRequiredOptions(): void {
+		$required = array( 'bcc_ev_api_key', 'bcc_ev_api_url', 'bcc_ev_project_id' );
+		$missing  = array();
+		foreach ( $required as $opt ) {
+			$value = get_option( $opt );
+			if ( $value === '' || $value === false ) {
+				$missing[] = $opt;
+			}
+		}
+		if ( ! empty( $missing ) ) {
+			throw new Exception( 'Required plugin option(s) missing: ' . implode( ', ', $missing ) );
+		}
+	}
+
+	/**
+	 * @param array<int,object>        $members
+	 * @param array<string,mixed>|null $latestSyncedMember
+	 * @param bool                     $pointerFound  out-param: true if the pointer matched a row in $members
+	 * @return array<int,object>
+	 */
+	private function collectNewMembers( array $members, ?array $latestSyncedMember, bool &$pointerFound = false ): array {
+		// Prefer the invariant easyVerein primary key as break-marker — an
+		// email_or_user_name change in easyVerein would otherwise blow the
+		// state out the window. Fall back to email for legacy pointers
+		// written by plugin <= 1.x.
+		$lastId       = is_array( $latestSyncedMember ) ? ( $latestSyncedMember['id'] ?? null ) : null;
+		$lastEmail    = is_array( $latestSyncedMember ) ? ( $latestSyncedMember['email_or_user_name'] ?? null ) : null;
+		$today        = ( new DateTime( 'now', new DateTimeZone( 'Europe/Berlin' ) ) )->format( 'Y-m-d' );
+		$result       = array();
+		$pointerFound = false;
+
+		foreach ( $members as $member ) {
+			// Break first: identity check must beat all other filters so the
+			// loop stops at the last-synced row even if that row has e.g. an
+			// empty membership_number due to back-office cleanup.
+			if ( $lastId !== null && isset( $member->id ) && (int) $member->id === (int) $lastId ) {
+				$pointerFound = true;
+				break;
+			}
+			if ( $lastId === null && $lastEmail !== null && ( $member->email_or_user_name ?? null ) === $lastEmail ) {
+				$pointerFound = true;
 				break;
 			}
 
-			$notSyncedMembers[] = $member;
-		}
-
-		foreach($notSyncedMembers as $member) {
-			$this->log($member->emailOrUserName);
-		}
-
-		$message = get_option('bcc_ev_welcome_text');
-		$this->log('Got welcome message text');
-
-		$additionalProjects = explode(',', get_option('bcc_ev_project_id_additional'));
-
-		if(count($additionalProjects) === 0) {
-			$additionalProjects = [];
-		}
-		
-		$projectIdHQ = get_option('bcc_ev_project_id');
-		$welcomeMessageId = get_option('bcc_ev_welcome_text_message_id');
-		
-		$bclient = new BClient();
-		$this->log('Starting Sync Process');
-
-		try {
-			// Iterate over new members ...
-			foreach($notSyncedMembers as $member) {
-				$this->log('Syncing ' . $member->emailOrUserName);
-
-				// Get the members details
-				$this->log('Getting member details from EasyVerein');
-				$memberDetails = $evClient->getMemberDetails($member);
-				$this->log('Got member details');				
-				
-				// Create the account and add it to PP general project
-				$this->log('Granting ' . $member->emailOrUserName . ' to project ' . $projectIdHQ);
-				
-				$payload = [
-					'email' => $memberDetails->primaryEmail,
-					'name' => $memberDetails->name,
-					'company' => '',
-					'title' => ''
-				];
-				
-				$this->log('payload: ' . print_r($payload, true));
-
-				$data = $bclient->people()->create($payload, $projectIdHQ);
-
-				$this->log('Result: ' . print_r($data, true));
-				
-				if (!property_exists($data, 'granted') || count($data->granted) === 0) {
-					$this->log('Could not create Basecamp account for ' . $member->emailOrUserName . ". Possibly already added to project? \r\n <pre>" . print_r($data, true) . '</pre>');
-				}
-
-				// Add user to additional projects (Helping hands etc.)
-				foreach($additionalProjects as $projectId) {
-					$this->log('Adding ' . $member->emailOrUserName . ' to additional project ' . $projectId);
-					$result = $bclient->people()->addToProject(trim($projectId), $data->granted[0]->id);				
-					
-					if (!property_exists($result, 'granted')) {
-						$this->log('Could not add user ' . $member->emailOrUserName . ' to additional project ' . $projectId . ". Possibly already added? \r\n <pre>" . print_r($data, true) . '</pre>');
-					} else {
-						$this->log('Added ' . $member->emailOrUserName . ' to additional project ' . $projectId . "\r\n");
-					}
-				}			
-
-				// Create the welcome message
-				if (count($data->granted) > 0) {
-					$userLink = '<bc-attachment sgid="' . $data->granted[0]->attachable_sgid . '"></bc-attachment>';
-					$message = str_replace('{user}', $userLink, $message);
-					$result = $bclient->comments()->create($projectIdHQ, $welcomeMessageId, array(
-						'content' => $message
-					));
-
-					$this->log('Posted welcome message: ' . $message . '; Result: ' . print_r($result, true));
-				}
-
-				// Store the newest synced member
-				$evClient->setLatestSyncedMember([
-					'membershipNumber' => $member->membershipNumber,
-					'firstName' => $memberDetails->firstName,
-					'familyName' => $memberDetails->familyName,
-					'privateEmail' => $memberDetails->privateEmail,
-					'joinDate' => $member->joinDate,
-					'emailOrUserName' => $member->emailOrUserName
-				]);
-
-				$this->log('Added ' . $member->emailOrUserName);
+			$mNumber = $member->membership_number ?? null;
+			if ( $mNumber === null || $mNumber === '' ) {
+				// Only accepted members carry a membership_number; skip
+				// prospects, applications and pseudo-accounts.
+				continue;
 			}
-		} catch (\Exception $e) {
-			$this->log('Error while syncing members: ' . $e->getMessage(), 'error');
-			$error = true;
-			// wp_mail( get_option( 'admin_email' ), 'EasyVerein Sync Error', 'Error while syncing members from EasyVerein to Basecamp: ' . $e->getMessage() . "\r\n" . $log);
-		} finally {
-			// Store log with timestamp in plugins /log directory
-			$logFile = plugin_dir_path( dirname( __FILE__ ) ) . 'log/' . date('Y-m-d H:i:s') . '.log';
-			
-			$log = '';
 
-			foreach($this->log as $entry) {
-				$log .= $entry['level'] . ': ' . $entry['message'] . "\r\n";
+			// Skip members who have resigned on or before today. easyVerein
+			// sets resignation_date when the member leaves the club; we
+			// should not be granting them new Basecamp access.
+			$resignationDate = $member->resignation_date ?? null;
+			if ( ! empty( $resignationDate ) && substr( (string) $resignationDate, 0, 10 ) <= $today ) {
+				continue;
 			}
-			
-			// Append log to file
-			file_put_contents($logFile, $log, FILE_APPEND);
-			echo '<pre>';
-			print_r($log);
-			echo '</pre>';
 
-			if (isset($error) && $error === true) {
-				throw new \Exception('Error while syncing members. Check log for details.');
-			}			
+			$result[] = $member;
 		}
+
+		// Members come in DESC; sync oldest-first so a partial failure
+		// leaves the "last synced" pointer in a sensible position.
+		return array_reverse( $result );
 	}
 
-	/**
-	 * Log a message
-	 * 
-	 * @param string $message
-	 */
-	private function log($message, $level = 'debug')
-	{
-		$this->log[] = [
-			'message' => $message,
-			'timestamp' => date('Y-m-d H:i:s'),
-			'level' => $level
-		];
+	private function syncMember(
+		object $member,
+		Basecamp3Client $bc,
+		EasyVereinClient $ev,
+		int $projectIdHQ,
+		array $additionalProjectIds,
+		string $welcomeText,
+		int $welcomeMessageId
+	): void {
+		$email = $member->email_or_user_name ?? '(no-email)';
+		$this->logger->log( "Syncing {$email}" );
+
+		$details = $ev->getMemberContactDetails( $member );
+		$this->logger->log( 'Got contact details for ' . $email );
+
+		$payloadEmail = $details->primary_email ?? $details->private_email ?? $member->email ?? $email;
+		$payloadName  = $details->name ?? trim( ( $details->first_name ?? '' ) . ' ' . ( $details->family_name ?? '' ) ) ?: $email;
+
+		$this->logger->log( "Granting {$email} to project {$projectIdHQ}" );
+		$result = $bc->createPersonInProject( $projectIdHQ, (string) $payloadEmail, (string) $payloadName );
+
+		$granted = ( is_object( $result ) && isset( $result->granted ) && is_array( $result->granted ) ) ? $result->granted : array();
+		if ( empty( $granted ) ) {
+			$this->logger->log( "No new grant for {$email} (already in project?). Skipping additional projects + welcome.", 'info' );
+		} else {
+			$person   = $granted[0];
+			$personId = (int) $person->id;
+			$this->logger->log( "Granted {$email} as person {$personId}" );
+
+			foreach ( $additionalProjectIds as $projectId ) {
+				try {
+					$bc->grantPersonToProject( $projectId, $personId );
+					$this->logger->log( "Added {$email} to additional project {$projectId}" );
+				} catch ( \Throwable $e ) {
+					$this->logger->log( "Failed to add {$email} to additional project {$projectId}: " . $e->getMessage(), 'warning' );
+				}
+			}
+
+			if ( $welcomeMessageId > 0 && $welcomeText !== '' ) {
+				$userLink = '<bc-attachment sgid="' . esc_attr( (string) $person->attachable_sgid ) . '"></bc-attachment>';
+				$message  = str_replace( '{user}', $userLink, $welcomeText );
+				$bc->createComment( $projectIdHQ, $welcomeMessageId, array( 'content' => $message ) );
+				$this->logger->log( "Posted welcome comment for {$email}" );
+			}
+		}
+
+		$ev->setLatestSyncedMember(
+			array(
+				'id'                 => isset( $member->id ) ? (int) $member->id : null,
+				'membership_number'  => $member->membership_number ?? null,
+				'first_name'         => $details->first_name ?? null,
+				'family_name'        => $details->family_name ?? null,
+				'private_email'      => $details->private_email ?? null,
+				'join_date'          => $member->join_date ?? null,
+				'email_or_user_name' => $email,
+			)
+		);
+
+		$this->logger->log( "Synced {$email}" );
 	}
 }

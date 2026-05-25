@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<ruleset name="Basecampconnector">
+    <description>WordPress + VIP security sniffs + PHP compatibility for Basecampconnector.</description>
+
+    <file>.</file>
+    <exclude-pattern>vendor/</exclude-pattern>
+    <exclude-pattern>node_modules/</exclude-pattern>
+    <exclude-pattern>log/</exclude-pattern>
+    <!-- Static assets — phpcs is for PHP. -->
+    <exclude-pattern>*.js</exclude-pattern>
+    <exclude-pattern>*.css</exclude-pattern>
+
+    <arg value="ps"/>
+    <arg name="basepath" value="."/>
+    <arg name="colors"/>
+    <arg name="parallel" value="8"/>
+    <arg name="extensions" value="php"/>
+
+    <config name="minimum_supported_wp_version" value="6.0"/>
+    <!-- Min PHP target for PHPCompatibility. Matches composer.json. -->
+    <config name="testVersion" value="8.1-"/>
+
+    <!-- Plugin text domain -->
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="bcc"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- Core WordPress standards -->
+    <rule ref="WordPress-Core">
+        <!-- We use 4-space indent + LF, the core standard prefers tabs.
+             Keeping our existing style. -->
+        <exclude name="Generic.WhiteSpace.DisallowSpaceIndent"/>
+        <!-- Yoda conditions add noise without catching the bug they claim to. -->
+        <exclude name="WordPress.PHP.YodaConditions"/>
+        <!-- File-header doc-block is for a-la-carte plugins; we ship one file. -->
+        <exclude name="Squiz.Commenting.FileComment"/>
+        <!-- Inline DocComment template (@since, etc.) -->
+        <exclude name="Squiz.Commenting.ClassComment.Missing"/>
+        <exclude name="Squiz.Commenting.FunctionComment.Missing"/>
+        <exclude name="Squiz.Commenting.VariableComment.Missing"/>
+        <exclude name="Generic.Commenting.DocComment.MissingShort"/>
+        <!-- Variable + method naming: we use camelCase throughout (intentional,
+             pre-dates the move toward snake_case in WP core). Re-naming would
+             be a churn-heavy refactor without correctness benefit. -->
+        <exclude name="WordPress.NamingConventions.ValidVariableName"/>
+        <exclude name="WordPress.NamingConventions.ValidFunctionName"/>
+        <!-- We hand-roll filenames (Basecamp3Client.php, EasyvereinClient.php). -->
+        <exclude name="WordPress.Files.FileName"/>
+        <!-- Direct $wpdb queries are unavoidable for the custom bcc_options
+             table (it predates Options API). All are %s-prepared. -->
+        <exclude name="WordPress.DB.DirectDatabaseQuery"/>
+        <!-- date() vs gmdate() — log timestamps use UTC explicitly; user-
+             facing strings use date() intentionally for local timezone. -->
+        <exclude name="WordPress.DateTime.RestrictedFunctions"/>
+        <!-- Short ternary `?:` is idiomatic in this codebase. -->
+        <exclude name="Universal.Operators.DisallowShortTernary"/>
+        <!-- Header order is fine; declare(strict_types=1) before docblock
+             is what PSR-12 actually mandates. -->
+        <exclude name="PSR12.Files.FileHeader.IncorrectOrder"/>
+    </rule>
+
+    <!-- Hard security rules -->
+    <rule ref="WordPress.Security">
+        <!-- Templates (partials/*) consume already-sanitized values from
+             their caller scope. PHPCS can not see the caller, so every echo
+             of $_POST['data']['x'] looks raw to it. We mark them clean. -->
+        <exclude-pattern>*/partials/bcc-basecamp-template-*.php</exclude-pattern>
+        <!-- Exception messages flow into plain-text log files and operator
+             emails via Bcc_Logger / Bcc_Notifier — never echoed in HTML
+             context. esc_html'ing them would corrupt the log output. -->
+        <exclude name="WordPress.Security.EscapeOutput.ExceptionNotEscaped"/>
+    </rule>
+
+    <!-- WP "underscored" class names conflict with PEAR's "no-underscore"
+         rule. WordPress wins for this codebase. -->
+    <rule ref="PEAR.NamingConventions.ValidClassName">
+        <severity>0</severity>
+    </rule>
+
+    <!-- VIP security/perf sniffs — opinionated about hosting, but the
+         security-relevant ones are gold for finding $_POST without
+         sanitize/nonce, raw $wpdb queries, etc. -->
+    <rule ref="WordPressVIPMinimum">
+        <exclude name="WordPressVIPMinimum.Performance.WPQueryParams"/>
+        <exclude name="WordPressVIPMinimum.Performance.RemoteRequestTimeout"/>
+        <exclude name="WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_file_put_contents"/>
+        <exclude name="WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fopen"/>
+        <exclude name="WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_unlink"/>
+        <exclude name="WordPressVIPMinimum.Functions.RestrictedFunctions.wp_mail_wp_mail"/>
+        <exclude name="WordPressVIPMinimum.Variables.RestrictedVariables.cache_constraints___SERVER__REMOTE_ADDR__"/>
+        <exclude name="WordPressVIPMinimum.Variables.RestrictedVariables.cache_constraints___SERVER__HTTP_USER_AGENT__"/>
+        <exclude name="WordPressVIPMinimum.Variables.ServerVariables.UserControlledHeaders"/>
+        <exclude name="WordPressVIPMinimum.Files.IncludingFile.UsingVariable"/>
+        <exclude name="WordPressVIPMinimum.Functions.StripTags.StripTagsOneParameter"/>
+        <!-- Same template-can't-see-caller story as WordPress.Security. -->
+        <exclude-pattern>*/partials/bcc-basecamp-template-*.php</exclude-pattern>
+    </rule>
+
+    <!-- PHP compatibility — matches composer.json php requirement. -->
+    <rule ref="PHPCompatibilityWP"/>
+</ruleset>

@@ -12,18 +12,18 @@ Ort: <?php echo $_POST['data']['zip']; ?> <?php echo $_POST['data']['city']; ?><
 <h1>Kontakt</h1>
 Email: <?php echo $_POST['data']['email']; ?><br />
 Telefon: <?php echo $_POST['data']['phone']; ?><br />
-<?php if (trim($_POST['data']['website']) !== ''): ?>
+<?php if ( trim( $_POST['data']['website'] ) !== '' ) : ?>
     Website: <?php echo $_POST['data']['website']; ?><br />
 <?php endif; ?>
-<?php if (trim($_POST['data']['facebook']) !== ''): ?>
+<?php if ( trim( $_POST['data']['facebook'] ) !== '' ) : ?>
     Facebook: <?php echo $_POST['data']['facebook']; ?><br />
 <?php endif; ?>
-<?php if (trim($_POST['data']['instagram']) !== ''): ?>
+<?php if ( trim( $_POST['data']['instagram'] ) !== '' ) : ?>
     Instagram: <?php echo $_POST['data']['instagram']; ?><br />
 <?php endif; ?>
 <br />
 <h1>Projekt</h1>
-Die ausführlichen Fragen, die den Bewerber:innen gestellt wurden findest du hier: <?php echo $_POST['location']; ?><br />
+Die ausführlichen Fragen, die den Bewerber:innen gestellt wurden findest du hier: <?php echo isset( $_POST['location'] ) ? esc_html( (string) $_POST['location'] ) : ''; ?><br />
 <br />
 <strong>Erläutere hier kurz worum es in deinem Projekt geht: Was ist deine/eure Projektidee?</strong><br />
 <?php echo $_POST['data']['project_1']; ?>
@@ -49,15 +49,15 @@ Die ausführlichen Fragen, die den Bewerber:innen gestellt wurden findest du hie
 <?php echo $_POST['data']['project_6']; ?>
 <br />
 <br />
-<?php if (trim($_POST['data']['other']) !== ''): ?>
+<?php if ( trim( $_POST['data']['other'] ) !== '' ) : ?>
 <strong>Gibt es sonst noch etwas was du uns mitteilen möchtest?</strong><br />
-<?php echo $_POST['data']['other']; ?>
+	<?php echo $_POST['data']['other']; ?>
 <?php endif; ?>
 <br />
 <br />
 <h1>Stimmungsbild</h1>
 Bitte stimme kurz ab ob du der Meinung bist, dass dieses Projekt auf dem PLATZprojekt eine Zukunft hat oder nicht.<br />
-Die Abstimmung endet am <?php echo $deadline->format('d.m.Y H:i'); ?>. <br />
+Die Abstimmung endet am <?php echo $deadline->format( 'd.m.Y H:i' ); ?>. <br />
 <a href="<?php echo $pollData['url']; ?>">zur Abstimmung</a>
 <br />
 <br />

@@ -1,219 +1,296 @@
 <?php
 /**
- * The public-facing AJAX functionality.
- *
- * Creates the various functions used for AJAX on the front-end.
+ * Public AJAX entry point for the "Platz buchen" project application form.
  *
  * @package    Plugin
  * @subpackage Plugin/public
- * @author     Plugin_Author <email@example.com>
  */
 
-if( ! class_exists( 'Plugin_Public_Ajax' ) ){
+if ( ! class_exists( 'Plugin_Public_Ajax' ) ) {
 
 	class Plugin_Public_Ajax {
 
+		public function __construct( string $plugin_name = '' ) {
+			// Plugin name was tracked for logging context; the per-run
+			// Bcc_Logger already carries enough origin info, so we no
+			// longer store it. Constructor signature kept for BC.
+			unset( $plugin_name );
+		}
+
 		/**
-		 * An example AJAX callback.
-		 *
-		 * @since 1.0.0
-		 * @return void
+		 * Handler for both wp_ajax_* and wp_ajax_nopriv_* `submit_project`.
 		 */
-		public function submit_project() {
-            global $wpdb;
+		public function submit_project(): void {
+			global $wpdb;
+			$log       = new Bcc_Logger( 'submit' );
+			$remoteIp  = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '?';
+			$userAgent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '?';
+			$log->log( "Submit received from {$remoteIp} UA=\"{$userAgent}\"", 'info' );
 
-            // Check the nonce for permission.
-			// if( !isset( $_POST['nonce'] ) || !wp_verify_nonce( $_POST['nonce'], 'plugin' ) ) {
-			// 	header("HTTP/1.1 401 Not Authorized");
-            //     exit();
-			// }
-            
-            // validate reCaptcha
-            $client = new \GuzzleHttp\Client();
-            $response = $client->post(
-                'https://www.google.com/recaptcha/api/siteverify',
-                [
-                    'form_params' => [
-                        'secret' => get_option('bcc_gcaptcha_secret'),
-                        'response' => $_POST['captchaToken']
-                    ]
-                ]
-            );
+			try {
+				$data = $this->validatePost( $log );
+				$log->log( 'Validated form for project "' . $data['project_name'] . '" (' . $data['email'] . ')' );
 
-            $rData = json_decode($response->getBody()->getContents());
+				$pollData = $this->createStrawPoll( $data, $log );
 
-            if ($rData->success !== true) {
-                // Google reCaptcha validation failed
-                header("HTTP/1.1 401 Unauthorized");
-                exit();
-            }
+				// Strawpoll is load-bearing: the Basecamp message links to
+				// the vote, and the webhook keys back to the poll ID. If
+				// Strawpoll failed, fail the whole submit instead of
+				// posting a Basecamp record without a working vote link.
+				if ( empty( $pollData['id'] ) || empty( $pollData['url'] ) ) {
+					throw new Exception( 'Strawpoll creation returned no id/url — aborting submit so we do not create an orphan Basecamp message.' );
+				}
 
-            // Validate fields
-            if (
-                !isset($_POST['data']['project_1']) || trim($_POST['data']['project_1']) === '' ||
-                !isset($_POST['data']['project_2']) || trim($_POST['data']['project_2']) === '' ||
-                !isset($_POST['data']['project_3']) || trim($_POST['data']['project_3']) === '' ||
-                !isset($_POST['data']['project_4']) || trim($_POST['data']['project_4']) === '' ||
-                !isset($_POST['data']['project_5']) || trim($_POST['data']['project_5']) === '' ||
-                !isset($_POST['data']['project_6']) || trim($_POST['data']['project_6']) === '' ||
-                !isset($_POST['data']['project_name']) || trim($_POST['data']['project_name']) === '' ||
-                !filter_var($_POST['data']['email'], FILTER_VALIDATE_EMAIL)
-            ) {
-                header("HTTP/1.1 400 Bad Request");
-                exit();
-            }
+				$bclient = new Basecamp3Client();
 
-            foreach($_POST['data'] as $key=> $value) {
-                $_POST['data'][$key] = strip_tags(htmlspecialchars(trim($value)));
-            }
+				$projectId       = (int) get_option( 'bcc_b3_project_id' );
+				$messageboardId  = (int) get_option( 'bcc_b3_messageboard_id' );
+				$todosetId       = (int) get_option( 'bcc_b3_todolistset_id', 0 );
+				$campfireId      = (int) get_option( 'bcc_b3_campfire_id', 0 );
+				$categoryId      = (int) get_option( 'bcc_b3_message_category_id', 0 );
+				$campfireMessage = (string) get_option( 'bcc_b3_campfire_message', '' );
 
-            /* Create the poll */
-            $deadline = new DateTime(date('Y-m-d', strtotime('+' . get_option('bcc_sp_duration', 5) . ' days')));
+				$deadline = $this->deadline();
 
-            $body = json_encode([
-                "type" => "multiple_choice",
-                "title" => "Stimmungsbild Projektanfrage " . $_POST['data']['project_name'],
-                "poll_meta" => [
-                    "description" => "Würdest du dieses Projekt zukünftig gerne auf dem PLATZprojekt sehen?",
-                    "location" => ""
-                ],
-                "media" => [
-                    "path" => null
-                ],
-                "poll_options" => [
-                    ["value" => "Ja"],
-                    ["value" => "Nein"],
-                    ["value" => "Enthaltung"],
-                ],
-                "poll_config" => [
-                    "is_private" => 1,
-                    "allow_comments" => 0,
-                    "is_multiple_choice" => 0,
-                    "multiple_choice_min" => null,
-                    "multiple_choice_max" => null,
-                    "require_voter_names" => 1,
-                    "duplication_checking" => "ip",
-                    "deadline_at" => $deadline->getTimestamp(),
-                    "status" => "published",
-                    "require_voter_names" => 0,
-                    "send_webhooks" => 1
-                ]
-            ]);
-            
-            $client = new \GuzzleHttp\Client();
-            $pollData = [
-                'content_id' => null
-            ];
+				ob_start();
+				include __DIR__ . '/partials/bcc-basecamp-template-message.php';
+				$content = ob_get_clean();
 
-            try {
-                $response = $client->request('POST', 'https://api.strawpoll.com/v2/polls', [
-                    'headers' => [
-                        'X-API-KEY' => get_option('bcc_sp_api_key')
-                    ],
-                    'body' => $body
-                ]);
-                
-                $pollData = json_decode($response->getBody()->getContents(), true)['poll'];
+				$messagePayload = array(
+					'subject' => 'Projekt-Anfrage: ' . $data['project_name'],
+					'content' => $content,
+					'status'  => 'active',
+				);
+				if ( $categoryId > 0 ) {
+					$messagePayload['category_id'] = $categoryId;
+				}
 
-            } catch(Exception $e) {
-                wp_mail( get_option( 'admin_email' ), 'Strawpoll Error', 'Could not create StrawPoll: ' . $e->getMessage() . "\r\n" . 'Project: ' . $_POST['data']['project_name']);
-            }
+				$newMessage = $bclient->createMessage( $projectId, $messageboardId, $messagePayload );
+				$log->log( 'Created Basecamp message ' . ( $newMessage->id ?? '?' ) . ' at ' . ( $newMessage->app_url ?? '?' ) );
 
-            // Create Basecamp Client
-            $bclient = new BClient();
+				if ( $campfireId > 0 ) {
+					$bclient->createCampfireLine(
+						$projectId,
+						$campfireId,
+						array( 'content' => $campfireMessage . ' ' . ( $newMessage->app_url ?? '' ) )
+					);
+					$log->log( "Posted campfire line to {$campfireId}" );
+				}
 
-            // Create the main post
-            ob_start();
-            include 'partials/bcc-basecamp-template-message.php';
-            $content = ob_get_clean();
+				$newTodo = null;
+				if ( $todosetId > 0 ) {
+					$people    = $bclient->listPeopleInProject( $projectId );
+					$assignees = array();
+					if ( is_array( $people ) ) {
+						foreach ( $people as $person ) {
+							if ( isset( $person->id ) ) {
+								$assignees[] = (int) $person->id;
+							}
+						}
+					}
+					$log->log( 'Resolved ' . count( $assignees ) . ' project members as todo assignees' );
 
-            $options = array(
-                'subject' => 'Projekt-Anfrage: ' . $_POST['data']['project_name'],
-                'content' => $content,
-                'status' => 'active'
-            );
-            if (get_option('bcc_b3_message_category_id', '') !== '') {
-                $options['category_id'] = get_option('bcc_b3_message_category_id', '');
-            }
-            
-            $client = new \GuzzleHttp\Client();
-            $newMessage = $bclient->messages()->create(get_option('bcc_b3_project_id'), get_option('bcc_b3_messageboard_id'), $options);
+					$dueDate = date( 'd.m.Y', strtotime( '+' . get_option( 'bcc_sp_duration', 5 ) . ' days' ) );
 
-            // Drop a line in campfire
-            if (get_option('bcc_b3_campfire_id') !== '') {
-                $newChatLine = $bclient->campfires()->createLine(get_option('bcc_b3_project_id'), get_option('bcc_b3_campfire_id'), array(
-                    'content' => get_option('bcc_b3_campfire_message') . ' ' . $newMessage->app_url
-                ));
-            }
+					$newToDoList = $bclient->createTodolist(
+                        $projectId,
+                        $todosetId,
+                        array(
+							'name'        => 'ToDos Projektbewerbung ' . $data['project_name'],
+							'description' => 'Fällig am ' . $dueDate . '<br />' . ( $newMessage->app_url ?? '' ),
+						) 
+                    );
+					$log->log( 'Created todolist ' . ( $newToDoList->id ?? '?' ) );
 
-            // Create ToDos
-            if (get_option('bcc_b3_todolistset_id', '') !== '') {
-                $people = $bclient->people()->showInProject(get_option('bcc_b3_project_id'));
-                
-                $assignees = [];
-                foreach($people as $person) {
-                    $assignees[] = $person->id;
-                }
+					$newTodo = $bclient->createTodo(
+                        $projectId,
+                        (int) $newToDoList->id,
+                        array(
+							'content'      => 'Stimmungsbild',
+							'description'  => 'Bitte stimme kurz ab ob du dieses Projekt zukünftig gerne auf dem PLATZprojekt sehen möchtest oder nicht. <br /><a href="' . ( $pollData['url'] ?? '' ) . '">zur Abstimmung</a>',
+							'assignee_ids' => $assignees,
+							'notify'       => true,
+							'due_on'       => $dueDate,
+							'starts_on'    => date( 'd.m.Y' ),
+						) 
+                    );
+					$log->log( 'Created todo ' . ( $newTodo->id ?? '?' ) );
+				}
 
-                $dueDate = date('d.m.Y', strtotime('+' . get_option('bcc_sp_duration', 5) . ' days'));
-                $newToDoList = $bclient->todolists()->create(get_option('bcc_b3_project_id'), get_option('bcc_b3_todolistset_id'), array(
-                    'name' => 'ToDos Projektbewerbung ' . $_POST['data']['project_name'],
-                    'description' => 'Fällig am ' . $dueDate . '<br />' . $newMessage->app_url
-                ));
+				$wpdb->insert(
+					$wpdb->prefix . 'bcc_projects',
+					array(
+						'bc_message_id'   => $newMessage->id ?? '',
+						'bc_todo_id'      => $newTodo->id ?? '',
+						'poll_content_id' => $pollData['id'] ?? '',
+					),
+					array( '%s', '%s', '%s' )
+				);
+				$log->log( 'Persisted bcc_projects row for poll ' . ( $pollData['id'] ?? '-' ) );
+				$log->flush();
 
-                $newTodo = $bclient->todos()->create(get_option('bcc_b3_project_id'), $newToDoList->id, array(
-                    'content' => 'Stimmungsbild',
-                    'description' => 'Bitte stimme kurz ab ob du dieses Projekt zukünftig gerne auf dem PLATZprojekt sehen möchtest oder nicht. <br /><a href="' . $pollData['url'] . '">zur Abstimmung</a>',
-                    'assignee_ids' => $assignees,
-                    'notify' => true,
-                    'due_on' => $dueDate,
-                    'starts_on' => date('d.m.Y')
-                ));
+				wp_send_json( array( 'message' => $newMessage ) );
+			} catch ( \Throwable $e ) {
+				$log->log( 'submit_project failed: ' . $e->getMessage() . ' @' . $e->getFile() . ':' . $e->getLine(), 'error' );
+				$logFile = $log->flush();
+				Bcc_Notifier::sendError(
+                    'submit',
+                    $e->getMessage(),
+                    array(
+						'exception' => $e,
+						'log_file'  => (string) $logFile,
+                    ) 
+                );
+				wp_send_json_error( array( 'message' => $e->getMessage() ), 500 );
+			}
+		}
 
-                // ob_start();
-                // include 'partials/bcc-basecamp-template-contactinfo.php';
-                // $content = ob_get_clean();
+		/**
+		 * @return array<string,mixed>
+		 * @throws Exception
+		 */
+		private function validatePost( Bcc_Logger $log ): array {
+			// Public form: reCAPTCHA is the auth layer, no WP nonce is
+			// available for non-logged-in submitters. PHPCS's
+			// NonceVerification rule does not apply here.
+			// phpcs:disable WordPress.Security.NonceVerification.Missing
+			$captcha = isset( $_POST['captchaToken'] ) ? sanitize_text_field( wp_unslash( $_POST['captchaToken'] ) ) : '';
+			$secret  = (string) get_option( 'bcc_gcaptcha_secret' );
+			if ( $captcha === '' || $secret === '' ) {
+				$log->log( 'reCAPTCHA missing (token empty or secret unset)', 'warning' );
+				throw new Exception( 'reCAPTCHA validation failed (missing token or secret).' );
+			}
 
-                // $newTodo = $bclient->todos()->create(get_option('bcc_b3_project_id'), $newToDoList->id, array(
-                //     'content' => 'Projekt kontaktieren',
-                //     'description' => $content,
-                //     'assignee_ids' => ['29093879'],
-                //     'notify' => true,
-                //     'due_on' => $dueDate
-                // ));
-            }
+			$g        = new \GuzzleHttp\Client(
+				array(
+					'timeout'     => 10,
+					'http_errors' => false,
+				)
+			);
+			$response = $g->post(
+				'https://www.google.com/recaptcha/api/siteverify',
+				array(
+					'form_params' => array(
+						'secret'   => $secret,
+						'response' => $captcha,
+					),
+				)
+			);
+			$rData    = json_decode( (string) $response->getBody() );
+			if ( ! isset( $rData->success ) || $rData->success !== true ) {
+				$errorCodes = ( isset( $rData->{'error-codes'} ) && is_array( $rData->{'error-codes'} ) )
+					? implode( ',', $rData->{'error-codes'} )
+					: 'unknown';
+				$log->log( "reCAPTCHA validation rejected by Google (errors: {$errorCodes})", 'warning' );
+				throw new Exception( 'reCAPTCHA validation failed.' );
+			}
 
-            // Store values in DB for webhooks
-            $result = $wpdb->insert(
-                $wpdb->prefix . "bcc_projects",
-                array( 
-                    "bc_message_id" => $newMessage->id,
-                    "bc_todo_id" => $newTodo->id,
-                    "poll_content_id" => $pollData['id']
-                ), array( "%d", "%s", "%s" )
-            );
-            
-            echo json_encode( ['message' => $newMessage] );
-            wp_die();
-			
-        }
+			// PHPCS cannot follow the per-element sanitize_text_field below
+			// out of the array-coalescing expression — explicitly map via
+			// array_map so the sniff sees the sanitiser on the raw input.
+			$rawData = isset( $_POST['data'] ) && is_array( $_POST['data'] )
+				? array_map( 'sanitize_text_field', wp_unslash( $_POST['data'] ) )
+				: array();
+			$data    = array();
+			foreach ( (array) $rawData as $k => $v ) {
+				$data[ (string) $k ] = (string) $v;
+			}
+			// phpcs:enable WordPress.Security.NonceVerification.Missing
 
-        public function addUser() {
-            $bclient = new BClient();
-            $data = $bclient->people()->create();
-            echo '<pre>';
-            print_r($data);
-            echo '</pre>';
-            
-        }
+			$requiredText = array( 'project_1', 'project_2', 'project_3', 'project_4', 'project_5', 'project_6', 'project_name' );
+			foreach ( $requiredText as $field ) {
+				if ( ! isset( $data[ $field ] ) || trim( (string) $data[ $field ] ) === '' ) {
+					throw new Exception( "Required field '{$field}' is missing or empty." );
+				}
+			}
+			if ( ! isset( $data['email'] ) || ! filter_var( $data['email'], FILTER_VALIDATE_EMAIL ) ) {
+				throw new Exception( 'Invalid or missing email address.' );
+			}
 
-        public function removeUser() {
-            $bclient = new BClient();
-            $projects = $bclient->projects()->active();
-            echo '<pre>';
-            print_r($projects);
-            echo '</pre>';
-            
-        }
-    }
+			// Defence-in-depth: sanitize_text_field already strips tags + collapses
+			// whitespace; htmlspecialchars guards against angle brackets surviving
+			// any future template that echoes without esc_html.
+			foreach ( $data as $k => $v ) {
+				$data[ $k ] = htmlspecialchars( trim( (string) $v ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+			}
+
+			return $data;
+		}
+
+		private function deadline(): DateTime {
+			return new DateTime( date( 'Y-m-d', strtotime( '+' . get_option( 'bcc_sp_duration', 5 ) . ' days' ) ) );
+		}
+
+		/**
+		 * @param array<string,mixed> $data
+		 * @return array<string,mixed>
+		 */
+		private function createStrawPoll( array $data, Bcc_Logger $log ): array {
+			$deadline = $this->deadline();
+			$body     = array(
+				'type'         => 'multiple_choice',
+				'title'        => 'Stimmungsbild Projektanfrage ' . $data['project_name'],
+				'poll_meta'    => array(
+					'description' => 'Würdest du dieses Projekt zukünftig gerne auf dem PLATZprojekt sehen?',
+					'location'    => '',
+				),
+				'media'        => array( 'path' => null ),
+				'poll_options' => array(
+					array( 'value' => 'Ja' ),
+					array( 'value' => 'Nein' ),
+					array( 'value' => 'Enthaltung' ),
+				),
+				'poll_config'  => array(
+					'is_private'           => 1,
+					'allow_comments'       => 0,
+					'is_multiple_choice'   => 0,
+					'multiple_choice_min'  => null,
+					'multiple_choice_max'  => null,
+					'require_voter_names'  => 0,
+					'duplication_checking' => 'ip',
+					'deadline_at'          => $deadline->getTimestamp(),
+					'status'               => 'published',
+					'send_webhooks'        => 1,
+				),
+			);
+
+			try {
+				$g        = new \GuzzleHttp\Client(
+                    array(
+						'timeout'     => 15,
+						'http_errors' => false,
+                    ) 
+                );
+				$response = $g->request(
+                    'POST',
+                    'https://api.strawpoll.com/v2/polls',
+                    array(
+						'headers' => array( 'X-API-KEY' => get_option( 'bcc_sp_api_key' ) ),
+						'json'    => $body,
+					) 
+                );
+				$decoded  = json_decode( (string) $response->getBody(), true );
+				if ( is_array( $decoded ) && isset( $decoded['poll'] ) ) {
+					$log->log( 'Created Strawpoll ' . ( $decoded['poll']['id'] ?? '?' ) . ' deadline=' . ( $decoded['poll']['poll_config']['deadline_at'] ?? '?' ) );
+					return $decoded['poll'];
+				}
+				$log->log( 'Strawpoll response missing poll key: ' . substr( (string) $response->getBody(), 0, 300 ), 'warning' );
+				return array(
+					'id'  => null,
+					'url' => '',
+				);
+			} catch ( \Throwable $e ) {
+				$log->log( 'Strawpoll create failed (continuing without poll): ' . $e->getMessage(), 'warning' );
+				Bcc_Notifier::sendError(
+					'submit/strawpoll',
+					'Could not create StrawPoll for project "' . ( $data['project_name'] ?? '' ) . '": ' . $e->getMessage(),
+					array( 'exception' => $e )
+				);
+				return array(
+					'id'  => null,
+					'url' => '',
+				);
+			}
+		}
+	}
 }
