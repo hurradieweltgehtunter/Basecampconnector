@@ -1,76 +1,79 @@
 <?php
-
 /**
- * Fired during plugin activation
+ * Plugin activation: idempotent table create + lightweight schema migration.
  *
- * @link       https://florianlenz.com
- * @since      1.0.0
- *
- * @package    Bcc
- * @subpackage Bcc/includes
+ * `bcc_options.value` was VARCHAR(1000) in <= 1.0.0; easyVerein bearer tokens
+ * can exceed that, so we bump to TEXT on every activation.
  */
 
-/**
- * Fired during plugin activation.
- *
- * This class defines all code necessary to run during the plugin's activation.
- *
- * @since      1.0.0
- * @package    Bcc
- * @subpackage Bcc/includes
- * @author     Florian Lenz <hi@florianlenz.com>
- */
 class Bcc_Activator {
 
-	/**
-	 * Short Description. (use period)
-	 *
-	 * Long Description.
-	 *
-	 * @since    1.0.0
-	 */
-	public static function activate() {
+	public static function activate(): void {
 		global $wpdb;
-		if ($wpdb->get_var('SELECT count(*) FROM information_schema.TABLES WHERE (TABLE_SCHEMA = "' . $wpdb->dbname . '") AND (TABLE_NAME = "' . $wpdb->base_prefix . 'bcc_options")') <= 0) {
-			// Table not installed, install it
-			$charset_collate = $wpdb->get_charset_collate();
-			$sql = "CREATE TABLE `{$wpdb->base_prefix}bcc_options` (
-			  identifier varchar(100) NOT NULL,
-			  `value` varchar(1000) NOT NULL,
-			  PRIMARY KEY  (identifier)
-			) $charset_collate;";
-	  
-			require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-			dbDelta($sql);
-				
-			$success = empty($wpdb->last_error);
-			if ($success) {
-				$wpdb->insert("{$wpdb->base_prefix}bcc_options", array("identifier" => 'access_token',"value" => ''),array("%s", "%s"));
-				$wpdb->insert("{$wpdb->base_prefix}bcc_options", array("identifier" => 'refresh_token',"value" => ''),array("%s", "%s"));
-				$wpdb->insert("{$wpdb->base_prefix}bcc_options", array("identifier" => 'access_token_expires',"value" => ''),array("%s", "%s"));
-				$wpdb->insert("{$wpdb->base_prefix}bcc_options", array("identifier" => 'ev_bc_sync_last_new',"value" => ''),array("%s", "%s"));
-				$wpdb->insert("{$wpdb->base_prefix}bcc_options", array("identifier" => 'ev_bc_sync_last_deleted',"value" => ''),array("%s", "%s"));
-				$wpdb->insert("{$wpdb->base_prefix}bcc_options", array("identifier" => 'ev_api_token',"value" => ''),array("%s", "%s"));
-			}
-		} else {
-			// Table already installed
-		}
 
-		if ($wpdb->get_var('SELECT count(*) FROM information_schema.TABLES WHERE (TABLE_SCHEMA = "' . $wpdb->dbname . '") AND (TABLE_NAME = "' . $wpdb->base_prefix . 'bcc_projects")') <= 0) {
-			// Table not installed, install it
-			$charset_collate = $wpdb->get_charset_collate();
-			$sql = "CREATE TABLE `{$wpdb->base_prefix}bcc_projects` (
-				`id` int(11) NOT NULL AUTO_INCREMENT,
-				`bc_message_id` VARCHAR(25) NOT NULL,
-				`bc_todo_id` VARCHAR(25) NOT NULL,
-				`poll_content_id` varchar(50) NOT NULL,
-				PRIMARY KEY (id)
-			  ) $charset_collate";
-	  
-			require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-			dbDelta($sql);
-		} else {
-			// Table already installed
+		$charset_collate = $wpdb->get_charset_collate();
+		$prefix          = $wpdb->base_prefix;
+
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+		$sql_options = "CREATE TABLE `{$prefix}bcc_options` (
+			identifier varchar(100) NOT NULL,
+			`value` longtext NOT NULL,
+			PRIMARY KEY  (identifier)
+		) $charset_collate;";
+		dbDelta( $sql_options );
+
+		// Existing installs created the column as VARCHAR(1000); make sure it
+		// becomes LONGTEXT so refreshed bearer tokens (potentially > 1KB) fit.
+		self::maybe_widen_options_value_column( $prefix );
+
+		$sql_projects = "CREATE TABLE `{$prefix}bcc_projects` (
+			id int(11) NOT NULL AUTO_INCREMENT,
+			bc_message_id varchar(25) NOT NULL,
+			bc_todo_id varchar(25) NOT NULL,
+			poll_content_id varchar(50) NOT NULL,
+			PRIMARY KEY  (id)
+		) $charset_collate;";
+		dbDelta( $sql_projects );
+
+		// Seed required option rows if they are missing. Existing rows are
+		// preserved. Table name is a trusted WP prefix + literal — not user
+		// input — but we still interpolate explicitly because $wpdb->prepare
+		// rejects %s for identifiers.
+		$tableName = $prefix . 'bcc_options';
+		$seed      = array( 'access_token', 'refresh_token', 'access_token_expires', 'ev_bc_sync_last_new' );
+		foreach ( $seed as $identifier ) {
+			$exists = $wpdb->get_var(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $tableName is the WP-managed table prefix concatenated with a literal.
+				$wpdb->prepare( "SELECT 1 FROM `{$tableName}` WHERE identifier = %s", $identifier )
+			);
+			if ( $exists === null ) {
+				$wpdb->insert(
+					$tableName,
+					array(
+						'identifier' => $identifier,
+						'value'      => '',
+					),
+					array( '%s', '%s' )
+				);
+			}
+		}
+	}
+
+	private static function maybe_widen_options_value_column( string $prefix ): void {
+		global $wpdb;
+		$tableName = $prefix . 'bcc_options';
+		$column    = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'value'",
+				$wpdb->dbname,
+				$tableName
+			)
+		);
+		if ( $column && strtolower( (string) $column->DATA_TYPE ) !== 'longtext' ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $tableName is the WP-managed table prefix concatenated with a literal.
+			$wpdb->query( "ALTER TABLE `{$tableName}` MODIFY `value` LONGTEXT NOT NULL" );
 		}
 	}
 }

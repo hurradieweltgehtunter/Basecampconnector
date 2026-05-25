@@ -15,8 +15,9 @@
  * @wordpress-plugin
  * Plugin Name:       Basecamp Connector
  * Plugin URI:        https://platzprojekt.de
- * Description:       Adds a form via shortode, connects to your basecamp instance and posts contents
- * Version:           1.0.0
+ * Description:       Syncs easyVerein members to Basecamp 3, handles project application form + Strawpoll voting flow.
+ * Version:           2.0.0
+ * Requires PHP:      8.1
  * Author:            Florian Lenz
  * Author URI:        https://florianlenz.com
  * License:           GPL-2.0+
@@ -35,7 +36,7 @@ if ( ! defined( 'WPINC' ) ) {
  * Start at version 1.0.0 and use SemVer - https://semver.org
  * Rename this for your plugin and update it as you release new versions.
  */
-define( 'BCC_VERSION', '1.0.0' );
+define( 'BCC_VERSION', '2.0.0' );
 
 /**
  * The code that runs during plugin activation.
@@ -77,6 +78,5 @@ function run_bcc() {
 
 	$plugin = new Bcc();
 	$plugin->run();
-
 }
 run_bcc();

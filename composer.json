@@ -1,6 +1,40 @@
 {
+    "name": "platzprojekt/basecampconnector",
+    "description": "WordPress plugin that connects platzprojekt.de with Basecamp 3 and easyVerein.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0+",
     "require": {
-        "guzzlehttp/guzzle": "^7.0",
-        "arturf/basecamp-api": "dev-master"
+        "php": ">=8.1",
+        "ext-curl": "*",
+        "ext-json": "*",
+        "guzzlehttp/guzzle": "^7.5"
+    },
+    "require-dev": {
+        "php-parallel-lint/php-parallel-lint": "^1.4",
+        "phpstan/phpstan": "^1.12",
+        "szepeviktor/phpstan-wordpress": "^1.3",
+        "squizlabs/php_codesniffer": "^3.10",
+        "wp-coding-standards/wpcs": "^3.1",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "automattic/vipwpcs": "^3.0",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "scripts": {
+        "lint": "parallel-lint --no-progress --exclude vendor --exclude log .",
+        "analyse": "phpstan analyse --no-progress",
+        "sniff": "phpcs --report-width=120",
+        "fix": "phpcbf --report-width=120",
+        "ci": [
+            "@lint",
+            "@analyse",
+            "@sniff"
+        ]
     }
 }

@@ -30,14 +30,9 @@ class Bcc_Deactivator {
 	 * @since    1.0.0
 	 */
 	public static function deactivate() {
-		global $wpdb;
-
-		require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-
-		// $sql = "DROP TABLE `" . $wpdb->base_prefix . "bcc_options`";
-		// $wpdb->query($sql);
-
-		// $sql = "DROP TABLE `" . $wpdb->base_prefix . "bcc_projects`";
-		// $wpdb->query($sql);
+		// Intentionally a no-op. Plugin tables (bcc_options, bcc_projects)
+		// hold OAuth tokens and the last-synced-member pointer; we do not
+		// want a deactivation to lose them. Permanent removal happens in
+		// uninstall.php.
 	}
 }

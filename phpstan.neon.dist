@@ -1,0 +1,21 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - bcc.php
+        - includes
+        - admin
+        - public
+    excludePaths:
+        - vendor
+        - log
+        # WordPress-style HTML/PHP templates rely on variables imported
+        # from the caller's scope via `include`. PHPStan cannot follow that,
+        # so analysing them produces nothing but false positives.
+        - admin/partials/*.php
+        - public/partials/*.php
+    bootstrapFiles:
+        - vendor/autoload.php
+    treatPhpDocTypesAsCertain: false

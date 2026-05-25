@@ -57,10 +57,9 @@ class Bcc_Loader {
 	 */
 	public function __construct() {
 
-		$this->actions = array();
-		$this->filters = array();
+		$this->actions    = array();
+		$this->filters    = array();
 		$this->shortcodes = array();
-
 	}
 
 	/**
@@ -116,11 +115,10 @@ class Bcc_Loader {
 			'component'     => $component,
 			'callback'      => $callback,
 			'priority'      => $priority,
-			'accepted_args' => $accepted_args
+			'accepted_args' => $accepted_args,
 		);
 
 		return $hooks;
-
 	}
 
 	/**
@@ -134,14 +132,12 @@ class Bcc_Loader {
 			add_filter( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
 		}
 
-		foreach ( $this->actions as $hook ) {			
+		foreach ( $this->actions as $hook ) {           
 			add_action( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
 		}
 
-		foreach ( $this->shortcodes as $hook ) {			
+		foreach ( $this->shortcodes as $hook ) {            
 			add_shortcode( $hook['hook'], array( $hook['component'], $hook['callback'] ) );
 		}
-
 	}
-
 }
