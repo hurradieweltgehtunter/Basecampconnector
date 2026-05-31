@@ -133,13 +133,48 @@ class EasyVereinClient {
         $raw = $wpdb->get_var(
             "SELECT `value` FROM `{$wpdb->prefix}bcc_options` WHERE `identifier` = 'ev_bc_sync_last_new'"
         );
-        if ( $raw === null || $raw === '' ) {
+        if ( $raw === null ) {
+            return null;
+        }
+
+        // Strip a possible UTF-8 BOM and surrounding whitespace — both make an
+        // otherwise valid payload fail to decode and silently fall through to
+        // the legacy branch below.
+        $raw = trim( preg_replace( '/^\xEF\xBB\xBF/', '', (string) $raw ) );
+        if ( $raw === '' ) {
             return null;
         }
 
         $decoded = json_decode( $raw, true );
+
+        // Recover from raw control characters embedded in the payload — a stray
+        // newline/CR introduced when the value was edited by hand in a SQL or
+        // DB tool. JSON forbids unescaped control bytes inside strings, so
+        // json_decode bails with "Control character error". None of the pointer
+        // fields (ids, emails, ISO dates, names) ever legitimately contain
+        // control bytes, so stripping them recovers the object safely.
+        if ( $decoded === null && isset( $raw[0] ) && ( $raw[0] === '{' || $raw[0] === '[' ) ) {
+            $stripped = preg_replace( '/[\x00-\x1F]+/', '', $raw );
+            $decoded  = json_decode( (string) $stripped, true );
+        }
+
+        // Tolerate double-encoded payloads: a JSON string whose content is
+        // itself JSON (e.g. state written by a SQL client or an older plugin
+        // that wrapped the object in quotes). Without this, json_decode yields
+        // a string, is_array() is false, and the whole blob would be dumped
+        // into membership_number by the legacy branch.
+        $guard = 0;
+        while ( is_string( $decoded ) && $guard < 3 ) {
+            $inner = json_decode( $decoded, true );
+            if ( ! is_array( $inner ) && ! is_string( $inner ) ) {
+                break;
+            }
+            $decoded = $inner;
+            ++$guard;
+        }
+
         if ( ! is_array( $decoded ) ) {
-            // legacy pipe-separated format from 2024
+            // legacy pipe-separated format from 2024 ("number|email")
             $parts   = explode( '|', $raw );
             $decoded = array(
                 'membership_number'  => $parts[0] ?? null,
@@ -179,6 +214,16 @@ class EasyVereinClient {
     }
 
     private function normalizeSyncState( array $state ): array {
+        // Trim surrounding whitespace off keys. A control-character strip on a
+        // hand-corrupted payload can leave leading/trailing spaces on a key
+        // (e.g. "  private_email"), which would otherwise silently shadow the
+        // real field. Later keys win on collision so a clean key is preferred.
+        $trimmed = array();
+        foreach ( $state as $key => $value ) {
+            $trimmed[ is_string( $key ) ? trim( $key ) : $key ] = $value;
+        }
+        $state = $trimmed;
+
         $map = array(
             'membershipNumber' => 'membership_number',
             'emailOrUserName'  => 'email_or_user_name',
