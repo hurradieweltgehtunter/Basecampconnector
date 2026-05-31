@@ -409,7 +409,7 @@ class Bcc_Public {
 		$payloadName  = $details->name ?? trim( ( $details->first_name ?? '' ) . ' ' . ( $details->family_name ?? '' ) ) ?: $email;
 
 		if ( $dryRun ) {
-			$mid = var_export( $member->id ?? null, true );
+			$mid = isset( $member->id ) ? (string) $member->id : 'NULL';
 			$this->logger->log(
 				"[DRY-RUN] WOULD grant {$payloadName} <{$payloadEmail}> (member {$mid}) to project {$projectIdHQ}"
 			);
