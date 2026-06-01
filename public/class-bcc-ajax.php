@@ -207,11 +207,12 @@ if ( ! class_exists( 'Plugin_Public_Ajax' ) ) {
 				throw new Exception( 'Invalid or missing email address.' );
 			}
 
-			// Defence-in-depth: sanitize_text_field already strips tags + collapses
-			// whitespace; htmlspecialchars guards against angle brackets surviving
-			// any future template that echoes without esc_html.
+			// Just trim — sanitize_text_field already stripped tags and collapsed
+			// whitespace. Deliberately NO htmlspecialchars(): the Basecamp subject
+			// is plain text (entities like &quot; would show up literally), and the
+			// HTML message body escapes each field via esc_html() in the template.
 			foreach ( $data as $k => $v ) {
-				$data[ $k ] = htmlspecialchars( trim( (string) $v ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+				$data[ $k ] = trim( (string) $v );
 			}
 
 			return $data;
