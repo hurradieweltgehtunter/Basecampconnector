@@ -11,15 +11,6 @@
 
 class Bcc_Public {
 
-	/**
-	 * Dry-run fallback, used when the `bcc_sync_dry_run` option is unset.
-	 * true  = simulate: no Basecamp writes, pointer NOT advanced, every
-	 *         intended action logged with a [DRY-RUN] prefix.
-	 * false = live sync. Flip to false (or set option to 0) and re-deploy
-	 *         to arm the live sync again.
-	 */
-	private const DRY_RUN_DEFAULT = true;
-
 	/** @var string */
 	private $plugin_name;
 
@@ -233,10 +224,6 @@ class Bcc_Public {
 		}
 
 		try {
-			$dryRun  = (bool) get_option( 'bcc_sync_dry_run', self::DRY_RUN_DEFAULT );
-			$dryNote = $dryRun ? ' [DRY-RUN: no writes, pointer frozen]' : '';
-			$this->logger->log( 'Starting easyVerein to Basecamp member sync.' . $dryNote );
-
 			$this->assertRequiredOptions();
 
 			$evClient         = new EasyVereinClient();
@@ -294,10 +281,8 @@ class Bcc_Public {
 			}
 
 			foreach ( $notSyncedMembers as $member ) {
-				$this->syncMember( $member, $bcClient, $evClient, $projectIdHQ, $additional, $welcomeText, $welcomeMessageId, $dryRun );
+				$this->syncMember( $member, $bcClient, $evClient, $projectIdHQ, $additional, $welcomeText, $welcomeMessageId );
 			}
-
-			$this->logger->log( $dryRun ? 'Member sync DRY-RUN completed. Nothing was written, pointer unchanged.' : 'Member sync completed successfully.' );
 		} catch ( \Throwable $e ) {
 			$this->logger->log( 'Sync failed: ' . $e->getMessage() . ' @' . $e->getFile() . ':' . $e->getLine(), 'error' );
 			$logFile = $this->logger->flush();
@@ -396,8 +381,7 @@ class Bcc_Public {
 		int $projectIdHQ,
 		array $additionalProjectIds,
 		string $welcomeText,
-		int $welcomeMessageId,
-		bool $dryRun = false
+		int $welcomeMessageId
 	): void {
 		$email = $member->email_or_user_name ?? '(no-email)';
 		$this->logger->log( "Syncing {$email}" );
@@ -407,21 +391,6 @@ class Bcc_Public {
 
 		$payloadEmail = $details->primary_email ?? $details->private_email ?? $member->email ?? $email;
 		$payloadName  = $details->name ?? trim( ( $details->first_name ?? '' ) . ' ' . ( $details->family_name ?? '' ) ) ?: $email;
-
-		if ( $dryRun ) {
-			$mid = isset( $member->id ) ? (string) $member->id : 'NULL';
-			$this->logger->log(
-				"[DRY-RUN] WOULD grant {$payloadName} <{$payloadEmail}> (member {$mid}) to project {$projectIdHQ}"
-			);
-			foreach ( $additionalProjectIds as $extraId ) {
-				$this->logger->log( "[DRY-RUN] WOULD grant {$payloadEmail} to additional project {$extraId}" );
-			}
-			if ( $welcomeMessageId > 0 && $welcomeText !== '' ) {
-				$this->logger->log( "[DRY-RUN] WOULD post welcome comment on message {$welcomeMessageId} for {$payloadEmail}" );
-			}
-			$this->logger->log( "[DRY-RUN] Pointer left untouched (live run would advance to member {$mid})" );
-			return;
-		}
 
 		$this->logger->log( "Granting {$email} to project {$projectIdHQ}" );
 		$result = $bc->createPersonInProject( $projectIdHQ, (string) $payloadEmail, (string) $payloadName );
