@@ -2,29 +2,37 @@
  * All of the CSS for your public-facing functionality should be
  * included in this file.
  */
-#bcc .count_message {
+#bcc .count_message,
+.bcc-form .count_message {
     background-color: lightgray;
     font-size: 50%;
 }
 
-form#bcc .error-feedback {
+form#bcc .error-feedback,
+form.bcc-form .error-feedback {
     visibility: hidden;
 }
 
-form#bcc .has-error .error-feedback {
+form#bcc .has-error .error-feedback,
+form.bcc-form .has-error .error-feedback {
     visibility: visible;
 }
 
 form#bcc .has-error input,
 form#bcc .has-error textarea,
-form#bcc .has-error select {
+form#bcc .has-error select,
+form.bcc-form .has-error input,
+form.bcc-form .has-error textarea,
+form.bcc-form .has-error select {
     border-color: red;
 }
 
-form#bcc button[type="submit"] span {
+form#bcc button[type="submit"] span,
+form.bcc-form button[type="submit"] span {
     display: none;
 }
 
-form#bcc button[type="submit"]:disabled span {
+form#bcc button[type="submit"]:disabled span,
+form.bcc-form button[type="submit"]:disabled span {
     display: inline-block;
 }

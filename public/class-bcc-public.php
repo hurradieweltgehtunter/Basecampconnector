@@ -26,13 +26,28 @@ class Bcc_Public {
 		$this->logger      = new Bcc_Logger( 'sync' );
 	}
 
+	/** Legacy project-application form ([BasecampForm]). */
+	private function pageHasLegacyForm( $post ): bool {
+		return $post->post_type === 'post'
+			|| ( $post->post_type === 'page' && has_shortcode( $post->post_content, 'BasecampForm' ) );
+	}
+
+	/**
+	 * Simple request forms ([BasecampEventForm] / [BasecampRoomForm]).
+	 * Detected by shortcode presence regardless of post type, so the assets
+	 * load wherever the form is embedded (page, post or CPT).
+	 */
+	private function pageHasRequestForm( $post ): bool {
+		return has_shortcode( $post->post_content, 'BasecampEventForm' )
+			|| has_shortcode( $post->post_content, 'BasecampRoomForm' );
+	}
+
 	public function enqueue_styles() {
 		global $post;
 		if ( ! isset( $post ) ) {
 			return;
 		}
-		$postType = $post->post_type;
-		if ( $postType === 'post' || ( $postType === 'page' && has_shortcode( $post->post_content, 'BasecampForm' ) ) ) {
+		if ( $this->pageHasLegacyForm( $post ) || $this->pageHasRequestForm( $post ) ) {
 			wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/bcc-public.css', array(), $this->version, 'all' );
 			wp_enqueue_style( 'bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css', array(), '5.0.0', 'all' );
 		}
@@ -43,8 +58,15 @@ class Bcc_Public {
 		if ( ! isset( $post ) ) {
 			return;
 		}
-		$postType = $post->post_type;
-		if ( $postType === 'post' || ( $postType === 'page' && has_shortcode( $post->post_content, 'BasecampForm' ) ) ) {
+
+		$legacy  = $this->pageHasLegacyForm( $post );
+		$request = $this->pageHasRequestForm( $post );
+
+		if ( $legacy || $request ) {
+			wp_enqueue_script( 'bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js', array( 'jquery' ), '5.0.0', false );
+		}
+
+		if ( $legacy ) {
 			wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/bcc-public.js', array( 'jquery' ), $this->version, false );
 			wp_localize_script(
 				$this->plugin_name,
@@ -54,14 +76,40 @@ class Bcc_Public {
 					'nonce'   => wp_create_nonce( 'plugin' ),
 				)
 			);
-			wp_enqueue_script( 'bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js', array( 'jquery' ), '5.0.0', false );
 			wp_enqueue_script( 'GoogleCaptcha', 'https://www.google.com/recaptcha/api.js?render=6LeQGyYaAAAAAINGjzIYW3mMczOjXK33rvRV3vdo', array( 'jquery' ), '3', false );
+		}
+
+		if ( $request ) {
+			$sitekey = (string) get_option( 'bcc_gcaptcha_sitekey' );
+			wp_enqueue_script( 'bcc-request', plugin_dir_url( __FILE__ ) . 'js/bcc-request.js', array( 'jquery' ), $this->version, false );
+			wp_localize_script(
+				'bcc-request',
+				'params',
+				array(
+					'ajaxurl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'plugin' ),
+					'sitekey' => $sitekey,
+				)
+			);
+			wp_enqueue_script( 'GoogleCaptcha', 'https://www.google.com/recaptcha/api.js?render=' . rawurlencode( $sitekey ), array( 'jquery' ), '3', false );
 		}
 	}
 
 	public function BasecampFormFunc() {
 		ob_start();
 		include plugin_dir_path( __FILE__ ) . '/partials/bcc-public-display.php';
+		return ob_get_clean();
+	}
+
+	public function BasecampEventFormFunc() {
+		ob_start();
+		include plugin_dir_path( __FILE__ ) . '/partials/bcc-event-form-display.php';
+		return ob_get_clean();
+	}
+
+	public function BasecampRoomFormFunc() {
+		ob_start();
+		include plugin_dir_path( __FILE__ ) . '/partials/bcc-room-form-display.php';
 		return ob_get_clean();
 	}
 

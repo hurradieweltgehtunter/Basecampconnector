@@ -47,6 +47,7 @@ class Bcc {
 		require_once $base . 'admin/class-bcc-admin.php';
 		require_once $base . 'public/class-bcc-public.php';
 		require_once $base . 'public/class-bcc-ajax.php';
+		require_once $base . 'public/class-bcc-request-ajax.php';
 
 		$this->loader = new Bcc_Loader();
 	}
@@ -70,12 +71,18 @@ class Bcc {
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
 		$this->loader->add_shortcode( 'BasecampForm', $plugin_public, 'BasecampFormFunc' );
+		$this->loader->add_shortcode( 'BasecampEventForm', $plugin_public, 'BasecampEventFormFunc' );
+		$this->loader->add_shortcode( 'BasecampRoomForm', $plugin_public, 'BasecampRoomFormFunc' );
 		$this->loader->add_action( 'rest_api_init', $plugin_public, 'rest_api_init' );
 		$this->loader->add_action( 'easy_verein_basecamp_sync', $plugin_public, 'easy_verein_basecamp_sync' );
 
 		$plugin_ajax = new Plugin_Public_Ajax( $this->plugin_name );
 		$this->loader->add_action( 'wp_ajax_nopriv_submit_project', $plugin_ajax, 'submit_project' );
 		$this->loader->add_action( 'wp_ajax_submit_project', $plugin_ajax, 'submit_project' );
+
+		$plugin_request_ajax = new Bcc_Request_Ajax();
+		$this->loader->add_action( 'wp_ajax_nopriv_submit_bcc_request', $plugin_request_ajax, 'submit_request' );
+		$this->loader->add_action( 'wp_ajax_submit_bcc_request', $plugin_request_ajax, 'submit_request' );
 	}
 
 	public function run() {

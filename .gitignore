@@ -2,3 +2,4 @@
 /vendor
 /log/*.log
 !/log/.gitignore
+/.playwright-mcp

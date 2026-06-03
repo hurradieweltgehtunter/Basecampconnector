@@ -241,6 +241,36 @@ $redirectUri = get_site_url() . '/wp-admin/admin.php?page=Basecamp+Connector';
             </div>
         </div>
 
+        <h2>Veranstaltungsanfragen ([BasecampEventForm])</h2>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="bcc_b3_event_project_id" class="form-label">Event Project ID</label>
+                <input type="text" class="form-control" name="bcc_b3_event_project_id" value="<?php echo esc_attr( get_option( 'bcc_b3_event_project_id' ) ); ?>" />
+                <p>Project (bucket) the event request is posted to.</p>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="bcc_b3_event_messageboard_id" class="form-label">Event Messageboard ID</label>
+                <input type="text" class="form-control" name="bcc_b3_event_messageboard_id" value="<?php echo esc_attr( get_option( 'bcc_b3_event_messageboard_id' ) ); ?>" />
+            </div>
+        </div>
+
+        <h2>Raumanfragen ([BasecampRoomForm])</h2>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="bcc_b3_room_project_id" class="form-label">Room Project ID</label>
+                <input type="text" class="form-control" name="bcc_b3_room_project_id" value="<?php echo esc_attr( get_option( 'bcc_b3_room_project_id' ) ); ?>" />
+                <p>Project (bucket) the room request is posted to.</p>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="bcc_b3_room_messageboard_id" class="form-label">Room Messageboard ID</label>
+                <input type="text" class="form-control" name="bcc_b3_room_messageboard_id" value="<?php echo esc_attr( get_option( 'bcc_b3_room_messageboard_id' ) ); ?>" />
+            </div>
+        </div>
+
         <h2>Authentication details</h2>
         <div class="row mb-3">
             <div class="col-md-6">                
