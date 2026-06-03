@@ -36,3 +36,29 @@ form#bcc button[type="submit"]:disabled span,
 form.bcc-form button[type="submit"]:disabled span {
     display: inline-block;
 }
+
+/*
+ * Checkbox alignment: the theme's large type / line-height breaks
+ * Bootstrap's em-based float layout for .form-check. Lay the box and its
+ * (possibly multi-line) label out with flexbox instead so they align to the
+ * first text line regardless of theme styles.
+ */
+form.bcc-form .form-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding-left: 0;
+}
+
+form.bcc-form .form-check .form-check-input {
+    float: none;
+    flex: 0 0 auto;
+    margin: 0.2em 0 0 0;
+    width: 1.1em;
+    height: 1.1em;
+}
+
+form.bcc-form .form-check .form-check-label {
+    margin: 0;
+    line-height: 1.4;
+}
